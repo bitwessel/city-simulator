@@ -1,0 +1,160 @@
+/* ===========================================================================
+   Mythic Mayor — shared theme tokens & primitives.
+   Warm fantasy: deep night-blue ground, parchment panels, brass/wood accents.
+   =========================================================================== */
+
+:root {
+  /* Night & charcoal grounds */
+  --mm-night: #14171f;
+  --mm-night-2: #1c2230;
+  --mm-night-3: #232b3c;
+
+  /* Parchment family */
+  --mm-parchment: #f0e6d0;
+  --mm-parchment-2: #e6d8bb;
+  --mm-parchment-3: #d8c6a0;
+  --mm-parchment-ink: #3a2f1f;
+  --mm-parchment-ink-soft: #5e503a;
+
+  /* Brass / wood accents */
+  --mm-brass: #c9a24b;
+  --mm-brass-bright: #e7c66e;
+  --mm-wood: #6e4f33;
+  --mm-wood-dark: #4a3522;
+
+  /* Glass panel over the 3D scene (dark, translucent) */
+  --mm-glass: rgba(26, 22, 16, 0.82);
+  --mm-glass-2: rgba(34, 28, 20, 0.9);
+  --mm-glass-border: rgba(201, 162, 75, 0.35);
+
+  /* Text */
+  --mm-text: #efe6d2;
+  --mm-text-dim: #b9ab8e;
+  --mm-text-faint: #8a7d63;
+
+  /* Semantic tones */
+  --mm-good: #7fb389;
+  --mm-bad: #d97a6c;
+  --mm-weird: #b07fd6;
+  --mm-warn: #e0b341;
+
+  --mm-radius: 12px;
+  --mm-radius-sm: 8px;
+  --mm-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  --mm-shadow-sm: 0 4px 14px rgba(0, 0, 0, 0.35);
+
+  --mm-serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
+  --mm-body: Georgia, 'Times New Roman', serif;
+}
+
+/* ----- Parchment surface texture (subtle, CSS-only) ----- */
+.mm-parchment-surface {
+  background-color: var(--mm-parchment);
+  background-image:
+    radial-gradient(circle at 18% 22%, rgba(110, 79, 51, 0.06) 0, transparent 45%),
+    radial-gradient(circle at 82% 78%, rgba(110, 79, 51, 0.07) 0, transparent 50%),
+    linear-gradient(140deg, rgba(255, 255, 255, 0.18), rgba(0, 0, 0, 0.05));
+  color: var(--mm-parchment-ink);
+}
+
+/* ----- Generic panel over the scene ----- */
+.mm-panel {
+  background: var(--mm-glass);
+  border: 1px solid var(--mm-glass-border);
+  border-radius: var(--mm-radius);
+  box-shadow: var(--mm-shadow);
+  backdrop-filter: blur(6px);
+}
+
+/* ----- Buttons ----- */
+.mm-btn {
+  font-family: var(--mm-serif);
+  cursor: pointer;
+  border-radius: var(--mm-radius-sm);
+  border: 1px solid var(--mm-glass-border);
+  background: linear-gradient(180deg, var(--mm-night-3), var(--mm-night-2));
+  color: var(--mm-text);
+  padding: 8px 14px;
+  font-size: 0.95rem;
+  transition: transform 0.08s ease, background 0.15s ease, border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.mm-btn:hover {
+  border-color: var(--mm-brass);
+  box-shadow: 0 0 0 1px rgba(201, 162, 75, 0.25), var(--mm-shadow-sm);
+}
+.mm-btn:active {
+  transform: translateY(1px);
+}
+.mm-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.mm-btn--brass {
+  background: linear-gradient(180deg, var(--mm-brass-bright), var(--mm-brass));
+  color: #2a210f;
+  border-color: rgba(0, 0, 0, 0.25);
+  font-weight: 700;
+}
+.mm-btn--brass:hover {
+  box-shadow: 0 0 22px rgba(231, 198, 110, 0.45), var(--mm-shadow-sm);
+}
+.mm-btn--active {
+  border-color: var(--mm-brass-bright);
+  box-shadow: inset 0 0 0 1px var(--mm-brass);
+  color: var(--mm-brass-bright);
+}
+
+/* ----- Meters / bars ----- */
+.mm-meter {
+  position: relative;
+  height: 7px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+.mm-meter__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 6px;
+  transition: width 0.4s ease;
+}
+
+/* ----- Scrollbars ----- */
+.mm-scroll {
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--mm-brass) transparent;
+}
+.mm-scroll::-webkit-scrollbar {
+  width: 9px;
+}
+.mm-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(var(--mm-brass), var(--mm-wood));
+  border-radius: 8px;
+}
+.mm-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ----- Keyframes ----- */
+@keyframes mm-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes mm-pop-in {
+  0% { opacity: 0; transform: scale(0.92) translateY(8px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes mm-slide-left {
+  from { opacity: 0; transform: translateX(-18px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes mm-slide-right {
+  from { opacity: 0; transform: translateX(18px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes mm-slide-down {
+  from { opacity: 0; transform: translateY(-14px); }
+  to { opacity: 1; transform: translateY(0); }
+}

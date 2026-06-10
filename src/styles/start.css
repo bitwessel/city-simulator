@@ -1,0 +1,168 @@
+/* ===========================================================================
+   Start screen — gradient night sky, twinkling stars, floating lanterns.
+   =========================================================================== */
+
+.start {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 50% 120%, #3a2a4d 0%, transparent 55%),
+    radial-gradient(ellipse at 20% 0%, #1c2a4a 0%, transparent 50%),
+    linear-gradient(180deg, #0a0d18 0%, #141a2c 45%, #1d2438 100%);
+}
+
+/* Distant hill silhouette + city skyline at the bottom. */
+.start::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 26vh;
+  background:
+    radial-gradient(60% 100% at 50% 100%, rgba(201, 162, 75, 0.16), transparent 70%),
+    linear-gradient(180deg, transparent, #090b14 85%);
+  pointer-events: none;
+}
+
+/* Twinkling star field — two layered radial-gradient "fields". */
+.start__stars {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-repeat: repeat;
+  background-image:
+    radial-gradient(1px 1px at 20% 30%, rgba(255, 255, 255, 0.9), transparent),
+    radial-gradient(1px 1px at 70% 18%, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(1.5px 1.5px at 40% 60%, rgba(255, 246, 220, 0.9), transparent),
+    radial-gradient(1px 1px at 85% 50%, rgba(255, 255, 255, 0.8), transparent),
+    radial-gradient(1px 1px at 12% 75%, rgba(255, 255, 255, 0.6), transparent),
+    radial-gradient(1.5px 1.5px at 60% 80%, rgba(255, 246, 220, 0.85), transparent),
+    radial-gradient(1px 1px at 33% 12%, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(1px 1px at 92% 88%, rgba(255, 255, 255, 0.6), transparent);
+  background-size: 100% 100%;
+  animation: start-twinkle 5.5s ease-in-out infinite;
+}
+.start__stars--slow {
+  opacity: 0.55;
+  animation-duration: 8.5s;
+  animation-delay: -2s;
+  filter: blur(0.3px);
+}
+@keyframes start-twinkle {
+  0%, 100% { opacity: 0.85; }
+  50% { opacity: 0.35; }
+}
+
+/* Floating lanterns drifting upward. */
+.start__lantern {
+  position: absolute;
+  bottom: -8vh;
+  width: 14px;
+  height: 20px;
+  border-radius: 50% 50% 45% 45%;
+  background: radial-gradient(circle at 50% 35%, #ffe9a8, #e7a23a 70%, #b9701f);
+  box-shadow: 0 0 16px 4px rgba(231, 162, 58, 0.55);
+  opacity: 0.85;
+  pointer-events: none;
+  animation: start-float linear infinite;
+}
+@keyframes start-float {
+  0% { transform: translateY(0) translateX(0); opacity: 0; }
+  12% { opacity: 0.9; }
+  88% { opacity: 0.7; }
+  100% { transform: translateY(-118vh) translateX(var(--drift, 20px)); opacity: 0; }
+}
+
+/* ----- Card ----- */
+.start__card {
+  position: relative;
+  z-index: 2;
+  width: min(560px, 92vw);
+  padding: 44px 48px 40px;
+  text-align: center;
+  border-radius: 18px;
+  border: 1px solid rgba(201, 162, 75, 0.35);
+  background: rgba(18, 16, 24, 0.55);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.6), inset 0 0 60px rgba(201, 162, 75, 0.04);
+  backdrop-filter: blur(7px);
+  animation: mm-pop-in 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+
+.start__title {
+  font-family: var(--mm-serif);
+  font-size: clamp(2.6rem, 6vw, 3.8rem);
+  letter-spacing: 0.02em;
+  margin: 0;
+  line-height: 1.05;
+  background: linear-gradient(180deg, #ffe9a8, var(--mm-brass) 60%, #a67c2e);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 2px 30px rgba(231, 198, 110, 0.18);
+}
+.start__subtitle {
+  font-family: var(--mm-serif);
+  font-style: italic;
+  color: var(--mm-brass-bright);
+  margin: 10px 0 0;
+  font-size: 1.1rem;
+  opacity: 0.95;
+}
+.start__desc {
+  color: var(--mm-text-dim);
+  margin: 22px auto 28px;
+  max-width: 42ch;
+  line-height: 1.55;
+  font-size: 1rem;
+}
+
+.start__seed {
+  display: block;
+  text-align: left;
+  max-width: 360px;
+  margin: 0 auto 22px;
+}
+.start__seed-label {
+  display: block;
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mm-text-faint);
+  margin-bottom: 6px;
+}
+.start__seed-input {
+  width: 100%;
+  font-family: var(--mm-body);
+  font-size: 1rem;
+  padding: 11px 14px;
+  border-radius: var(--mm-radius-sm);
+  border: 1px solid rgba(201, 162, 75, 0.4);
+  background: rgba(8, 9, 14, 0.6);
+  color: var(--mm-text);
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.start__seed-input::placeholder {
+  color: var(--mm-text-faint);
+  font-style: italic;
+}
+.start__seed-input:focus {
+  border-color: var(--mm-brass-bright);
+  box-shadow: 0 0 0 3px rgba(231, 198, 110, 0.18);
+}
+
+.start__create {
+  font-size: 1.2rem;
+  padding: 14px 30px;
+  width: 100%;
+  max-width: 360px;
+}
+.start__hint {
+  margin: 18px 0 0;
+  font-size: 0.8rem;
+  color: var(--mm-text-faint);
+  font-style: italic;
+}
