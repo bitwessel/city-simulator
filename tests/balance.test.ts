@@ -86,7 +86,13 @@ describe('relaxed balance: hands-off runs muddle through', () => {
         }
       }
     }
-  });
+    // Same generous ceiling as the run-everything test above: this block walks
+    // every history snapshot of all 50 cities, and under full-suite parallel
+    // load (the play-matters and headlines suites run concurrently) the default
+    // 5s per-test timeout can be exceeded by wall-clock contention alone. The
+    // assertions are unchanged — only the clock ceiling is raised so a busy CI
+    // box doesn't flake. No balance threshold is touched.
+  }, SUITE_TIMEOUT_MS);
 
   it('median day-250 happiness lands in the relaxed band (40..60)', () => {
     // Median across runs still alive at the target day (an ended run has no

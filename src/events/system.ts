@@ -134,15 +134,39 @@ export function instantiateEvent(
 // ----- Applying consequences ---------------------------------------------------------
 
 /**
+ * How hard a player's decision lands. Milestone A added firm mean-reversion to
+ * most stats so a *neglected* city muddles back toward a neutral baseline — but
+ * that same reversion was quietly erasing the player's choices too: a memo
+ * fires only every ~45+ days, so a handful of ±3..±9 nudges over a 250-day run
+ * got pulled back to baseline within a week, and active play scored no better
+ * than ignoring every memo (measured good-vs-hands-off day-250 happiness gap:
+ * ~0.8 points, and zero triumphant endings reachable). This scalar amplifies
+ * the *declared* stat effects of a player choice so a decision is a real shove,
+ * not a nudge the tide swallows — that is the entire "keep play mattering"
+ * lever (prompts/02-relaxed-balance.md requirement 4).
+ *
+ * It only multiplies effects that flow through applyChoiceToCity — i.e. effects
+ * a *player* chose. Hands-off runs never resolve a memo (lapsed memos are
+ * stat-neutral), so this constant cannot move any hands-off balance metric; the
+ * milestone-A contract in tests/balance.test.ts is untouched by it.
+ */
+export const CHOICE_EFFECT_SCALE = 2.8;
+
+/**
  * Apply a stat delta to the city (in place — callers pass an already-copied
  * city). Low trust dampens the *positive* part of player-driven effects:
  * a city that doesn't believe in you doesn't respond to your policies.
+ *
+ * `scale` multiplies the whole delta (both halves). Player choices pass the
+ * CHOICE_EFFECT_SCALE so a decision actually moves the needle; the daily
+ * simulation and stat-neutral systems pass the default 1.
  */
 export function applyStatDelta(
   city: City,
   delta: StatDelta,
-  options: { trustDampened?: boolean } = {},
+  options: { trustDampened?: boolean; scale?: number } = {},
 ): void {
+  const scale = options.scale ?? 1;
   // Low trust dampens the positive half of a choice, but never below half
   // effect: even a city that doesn't believe in you still feels at least 50% of
   // a good policy. This floors the old trust death-loop (struggling city → trust
@@ -153,7 +177,7 @@ export function applyStatDelta(
     : 1;
   for (const [key, raw] of Object.entries(delta)) {
     const statKey = key as StatKey;
-    let amount = raw as number;
+    let amount = (raw as number) * scale;
     if (amount > 0) amount *= dampen;
     if (statKey === 'population') {
       city.stats.population = Math.max(0, Math.round(city.stats.population + amount));
@@ -201,7 +225,10 @@ export function applyChoiceToCity(
     ? city.factions.find((f) => f.id === event.factionId)?.name ?? null
     : null;
 
-  applyStatDelta(city, choice.effects, { trustDampened: true });
+  applyStatDelta(city, choice.effects, {
+    trustDampened: true,
+    scale: CHOICE_EFFECT_SCALE,
+  });
   applyFactionEffects(city, choice.factionEffects);
 
   if (choice.districtEffects && district) {
@@ -227,7 +254,9 @@ export function applyChoiceToCity(
 
   for (const outcome of choice.outcomes ?? []) {
     if (!rng.chance(outcome.chance)) continue;
-    if (outcome.effects) applyStatDelta(city, outcome.effects);
+    if (outcome.effects) {
+      applyStatDelta(city, outcome.effects, { scale: CHOICE_EFFECT_SCALE });
+    }
     applyFactionEffects(city, outcome.factionEffects);
     news.push({
       day: city.day,

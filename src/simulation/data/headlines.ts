@@ -81,6 +81,61 @@ export const HEADLINE_POOL: HeadlineTemplate[] = [
     tone: 'neutral',
     weight: 8,
   },
+  {
+    text: 'A wheel of cheese in {district} has been placed under gentle observation. It has done nothing wrong yet.',
+    tone: 'weird',
+    weight: 8,
+  },
+  {
+    text: 'Two rival knitting circles in {district} merge after a heartfelt and slightly tearful summit.',
+    tone: 'good',
+    weight: 8,
+  },
+  {
+    text: '{faction} pass a motion thanking the weather for "a really very acceptable week".',
+    tone: 'neutral',
+    weight: 8,
+  },
+  {
+    text: 'A revolution is declared in {district} and politely concluded by teatime; demands met, biscuits shared.',
+    tone: 'weird',
+    weight: 7,
+  },
+  {
+    text: 'Elderly tortoise of {district} completes its annual lap of the square; crowd moved to quiet applause.',
+    tone: 'good',
+    weight: 8,
+  },
+  {
+    text: 'Map-makers of {city} add a new shortcut; three families promptly get lost in delightful new ways.',
+    tone: 'neutral',
+    weight: 8,
+  },
+  {
+    text: 'Someone in {district} has been leaving soup on doorsteps. Investigations have been quietly abandoned.',
+    tone: 'good',
+    weight: 8,
+  },
+  {
+    text: 'The {city} library reports its overdue books are "coming home slowly, like geese".',
+    tone: 'neutral',
+    weight: 8,
+  },
+  {
+    text: 'A goblin in {district} files paperwork to officially adopt a very large, very confused goose.',
+    tone: 'weird',
+    weight: 8,
+  },
+  {
+    text: 'Neighbours in {district} spend the afternoon repainting a fence together for no reason anyone can name.',
+    tone: 'good',
+    weight: 8,
+  },
+  {
+    text: 'Town clock in {district} runs four minutes fast; residents agree to simply be four minutes early forever.',
+    tone: 'weird',
+    weight: 7,
+  },
 
   // ----- Pollution ------------------------------------------------------------
   {
@@ -161,7 +216,7 @@ export const HEADLINE_POOL: HeadlineTemplate[] = [
     text: 'Local economy described as "frugal" by optimists and "broke" by everyone else.',
     tone: 'bad',
     weight: 10,
-    condition: { maxStats: { wealth: 25 } },
+    condition: { maxStats: { wealth: 22 } },
   },
 
   // ----- Happiness ------------------------------------------------------------
@@ -175,7 +230,7 @@ export const HEADLINE_POOL: HeadlineTemplate[] = [
     text: 'A general air of glumness settles over {district}; even the dogs seem pensive.',
     tone: 'bad',
     weight: 10,
-    condition: { maxStats: { happiness: 30 } },
+    condition: { maxStats: { happiness: 22 } },
   },
 
   // ----- Food -----------------------------------------------------------------
@@ -189,7 +244,7 @@ export const HEADLINE_POOL: HeadlineTemplate[] = [
     text: 'Bread prices in {district} climb again; loaves now sold by the slice and the sigh.',
     tone: 'bad',
     weight: 11,
-    condition: { maxStats: { food: 30 } },
+    condition: { maxStats: { food: 22 } },
   },
 
   // ----- Safety ---------------------------------------------------------------
@@ -203,7 +258,7 @@ export const HEADLINE_POOL: HeadlineTemplate[] = [
     text: 'Pickpockets in {district} announce a customer loyalty program; the Watch is not amused.',
     tone: 'bad',
     weight: 10,
-    condition: { maxStats: { safety: 30 } },
+    condition: { maxStats: { safety: 22 } },
   },
 
   // ----- Trust ----------------------------------------------------------------
@@ -233,13 +288,19 @@ export const HEADLINE_POOL: HeadlineTemplate[] = [
     text: 'Family in {district} reportedly subletting a stairwell; landlord calls it "cozy".',
     tone: 'bad',
     weight: 10,
-    condition: { maxStats: { housing: 30 } },
+    condition: { maxStats: { housing: 22 } },
   },
   {
     text: 'A pothole in {district} grows large enough to be issued its own street name.',
+    tone: 'weird',
+    weight: 9,
+    condition: { maxStats: { infrastructure: 35 } },
+  },
+  {
+    text: 'Half the lanterns in {district} have gone dark and the bridges are held up mostly by optimism.',
     tone: 'bad',
     weight: 10,
-    condition: { maxStats: { infrastructure: 30 } },
+    condition: { maxStats: { infrastructure: 22 } },
   },
   {
     text: 'New roads in {city} so smooth that locals have taken up competitive strolling.',

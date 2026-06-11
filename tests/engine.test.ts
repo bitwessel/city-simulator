@@ -118,8 +118,15 @@ describe('simulation engine', () => {
     };
 
     const { city: next, news } = applyEventChoice(city, event, 'do-it');
-    expect(next.stats.wealth).toBeCloseTo(44, 5);
-    expect(next.stats.happiness).toBeCloseTo(55, 5);
+    // Phase-02 requirement 4 ("keep play mattering"): player choices are
+    // amplified by CHOICE_EFFECT_SCALE (=2.8) so a decision is a real shove,
+    // not a nudge the daily mean-reversion swallows. Trust is 80 here, so the
+    // dampen factor is 1 (min(1, 80/60)); effects scale by 2.8 in full.
+    //   wealth:    50 + (-6 * 2.8)       = 33.2
+    //   happiness: 50 + ( 5 * 2.8 * 1.0) = 64
+    // Faction effects are NOT scaled (the scalar is stat-only): 50 + 10 = 60.
+    expect(next.stats.wealth).toBeCloseTo(33.2, 5);
+    expect(next.stats.happiness).toBeCloseTo(64, 5);
     expect(next.factions[0].satisfaction).toBeCloseTo(60, 5);
     expect(news.some((n) => n.text === 'It is done.')).toBe(true);
     expect(next.eventLog).toHaveLength(1);
@@ -151,10 +158,15 @@ describe('simulation engine', () => {
       ],
     };
     const { city: next } = applyEventChoice(city, event, 'c');
-    // Floor raised 0.4 → 0.5 in phase 02 so the player's hand always retains at
-    // least half effect even in a fully distrustful city (50 + 10 * 0.5).
-    expect(next.stats.happiness).toBeCloseTo(55, 5); // 10 * 0.5
-    expect(next.stats.wealth).toBeCloseTo(40, 5); // negatives bite in full
+    // Two phase-02 play-matters levers compound here:
+    //   - the trust-dampen floor (0.5) keeps the positive half at >=50% effect
+    //     even at trust 0 (the old death-loop cap, requirement 3), and
+    //   - CHOICE_EFFECT_SCALE (=2.8) amplifies the whole declared delta so a
+    //     player choice actually moves the needle (requirement 4).
+    // Positive half: 50 + (10 * 2.8 * 0.5) = 64 (scaled, then half-dampened).
+    // Negative half: 50 + (-10 * 2.8)      = 22 (scaled; negatives never dampened).
+    expect(next.stats.happiness).toBeCloseTo(64, 5);
+    expect(next.stats.wealth).toBeCloseTo(22, 5);
   });
 
   it('keeps stats clamped even under extreme effects', () => {
@@ -227,6 +239,95 @@ describe('simulation engine', () => {
       }
     }
     expect(outcomeKind).toBe('ghost-town');
+  });
+
+  it('reaches the golden-age outcome when prosperity sustains', () => {
+    // Triumphant-ending reachability (phase-02 requirement 4: the
+    // ending-reachability tests must cover the happy endings, not only doom).
+    // golden-age gate (outcomes.ts): wealth>80 && culture>65 && happiness>60,
+    // minDay 30, streak 5. Pin those three above the line each tick and the
+    // streak should complete within a week or so.
+    let city = freshCity('outcome-golden');
+    city.day = 35; // clear the minDay-30 gate
+    let outcomeKind: string | null = null;
+    for (let i = 0; i < 12; i++) {
+      city.stats.wealth = 88;
+      city.stats.culture = 75;
+      city.stats.happiness = 70;
+      const result = simulateDay(city, { suppressEvents: true });
+      city = result.city;
+      if (result.outcome) {
+        outcomeKind = result.outcome.kind;
+        break;
+      }
+    }
+    expect(outcomeKind).toBe('golden-age');
+  });
+
+  it('reaches the utopia outcome when the city is genuinely thriving', () => {
+    // utopia gate: happiness>80 && beauty>70 && trust>70 && chaos<30,
+    // minDay 30, streak 5. Pin all four inside the qualifying band each tick.
+    let city = freshCity('outcome-utopia');
+    city.day = 35;
+    let outcomeKind: string | null = null;
+    for (let i = 0; i < 12; i++) {
+      city.stats.happiness = 88;
+      city.stats.beauty = 78;
+      city.stats.trust = 78;
+      city.stats.chaos = 20;
+      const result = simulateDay(city, { suppressEvents: true });
+      city = result.city;
+      if (result.outcome) {
+        outcomeKind = result.outcome.kind;
+        break;
+      }
+    }
+    expect(outcomeKind).toBe('utopia');
+  });
+
+  it('reaches the collapse outcome under sustained chaos and broken trust', () => {
+    // Catastrophic-ending reachability. collapse gate:
+    // (chaos>85 && trust<25) || (food<10 && happiness<25), minDay 12, streak 4.
+    // Drive the first clause: pin chaos high and trust low each tick.
+    let city = freshCity('outcome-collapse');
+    city.day = 18; // clear the minDay-12 gate
+    let outcomeKind: string | null = null;
+    for (let i = 0; i < 12; i++) {
+      city.stats.chaos = 92;
+      city.stats.trust = 18;
+      const result = simulateDay(city, { suppressEvents: true });
+      city = result.city;
+      if (result.outcome) {
+        outcomeKind = result.outcome.kind;
+        break;
+      }
+    }
+    expect(outcomeKind).toBe('collapse');
+  });
+
+  it('reaches the revolution outcome when trust craters and factions revolt', () => {
+    // revolution gate: trust<15 && >=2 factions with satisfaction<25,
+    // minDay 15, streak 3. Pin trust below the line and force two factions
+    // into the fury zone each tick (updateFactions would otherwise drift them
+    // back toward their stat-implied target).
+    let city = freshCity('outcome-revolution');
+    city.day = 20; // clear the minDay-15 gate
+    let outcomeKind: string | null = null;
+    for (let i = 0; i < 12; i++) {
+      city.stats.trust = 8;
+      city.factions[0].satisfaction = 10;
+      city.factions[1].satisfaction = 10;
+      const result = simulateDay(city, { suppressEvents: true });
+      city = result.city;
+      // Re-pin after the tick's faction drift, before the next outcome check
+      // window — checkOutcomes ran on the post-tick state above, so the next
+      // loop's pin is what keeps the streak alive.
+      if (result.outcome) {
+        outcomeKind = result.outcome.kind;
+        break;
+      }
+    }
+    expect(outcomeKind).toBe('revolution');
   });
 
   it('defines at least 6 distinct endings', () => {
