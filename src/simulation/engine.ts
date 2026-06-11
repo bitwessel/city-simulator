@@ -148,7 +148,12 @@ function updateCityStats(city: City, rng: Rng): void {
     city.factions.some((f) => f.archetype === archetype && f.satisfaction > 60);
   const unhappyFactions = city.factions.filter((f) => f.satisfaction < 25).length;
 
-  // Happiness drifts toward a target implied by living conditions.
+  // Happiness drifts toward a target implied by living conditions. Clean air
+  // and quiet streets are the *expected* baseline, not a windfall — so
+  // pollution and chaos only subtract once they climb past an ordinary
+  // background level (people don't throw a parade for the absence of smog).
+  // The good half is the livability stats; the result is an unattended city
+  // that sits comfortably mediocre rather than blissful.
   const happinessTarget =
     50 +
     (s.food - 50) * 0.25 +
@@ -156,16 +161,22 @@ function updateCityStats(city: City, rng: Rng): void {
     (s.safety - 50) * 0.2 +
     (s.beauty - 50) * 0.15 +
     (s.culture - 50) * 0.15 -
-    (s.pollution - 50) * 0.25 -
-    (s.chaos - 50) * 0.3;
+    Math.max(0, s.pollution - 25) * 0.3 -
+    Math.max(0, s.chaos - 30) * 0.35;
   const happiness = s.happiness + (clamp(happinessTarget, 0, 100) - s.happiness) * 0.08;
 
-  // Trust follows happiness slowly; chaos erodes it.
-  let trust = s.trust + (s.happiness - s.trust) * 0.04;
+  // Trust follows happiness slowly, but drifts back toward a wary middle: a
+  // populace's faith in its mayor settles around the low 50s rather than
+  // climbing to adoration on quiet days alone — devotion has to be earned, not
+  // accrued by default.
+  let trust = s.trust + (s.happiness - s.trust) * 0.04 + (50 - s.trust) * 0.01;
   if (s.chaos > 70) trust -= 0.5;
 
-  // Chaos decays naturally but feeds on neglect.
-  let chaos = s.chaos - 0.4;
+  // Chaos decays toward a low simmer, not silence: even a calm city keeps a
+  // little everyday friction (pickpockets, grumbling, a goblin parking dispute),
+  // so "quiet" reads as pleasantly ordinary rather than blissfully perfect. It
+  // still flares on real neglect.
+  let chaos = s.chaos + (25 - s.chaos) * 0.04;
   if (s.safety < 35) chaos += 0.6;
   if (s.housing < 30) chaos += 0.4;
   if (s.food < 25) chaos += 0.7;
@@ -179,49 +190,76 @@ function updateCityStats(city: City, rng: Rng): void {
   if (has('forest-edge')) pollution -= 0.15;
   if (factionHappy('gardeners')) pollution -= 0.15;
 
-  // Beauty suffers under smog, blooms with care.
-  let beauty = s.beauty + (50 - s.beauty) * 0.01;
+  // Beauty suffers under smog, blooms with care — but a city's looks drift
+  // firmly back toward ordinary: gardens and tidy streets keep it pleasant
+  // (~mid-50s), not picture-perfect, so a clean idle city stays handsome rather
+  // than ascending to a flawless utopia on greenery alone.
+  let beauty = s.beauty + (50 - s.beauty) * 0.04;
   if (s.pollution > 50) beauty -= (s.pollution - 50) * 0.03;
   if (factionHappy('gardeners')) beauty += 0.25;
   if (has('garden')) beauty += 0.1;
   if (s.chaos > 70) beauty -= 0.2;
 
-  // Safety tracks infrastructure, trust and (inverted) chaos.
-  const safetyTarget = s.infrastructure * 0.4 + s.trust * 0.3 + (100 - s.chaos) * 0.3;
+  // Safety tracks infrastructure, trust and (inverted) chaos, but a watch can
+  // only stretch so far: the weights fall a little short of a full hundred, so
+  // calm alone leaves a city ordinarily safe (mid-50s) — real patrols (happy
+  // engineers, a content night-watch) are what push it genuinely high.
+  const safetyTarget =
+    s.infrastructure * 0.35 + s.trust * 0.25 + (100 - s.chaos) * 0.25;
   let safety = s.safety + (safetyTarget - s.safety) * 0.06;
   if (factionHappy('night-watch')) safety += 0.2;
 
-  // Magic wanders; magical districts leak it.
-  let magic = s.magic + rng.range(-0.5, 0.5);
-  magic += countOf('magical') * 0.3;
+  // Magic wanders, but the weave settles toward a neutral hum: a firm pull
+  // toward 50 keeps a lone magical quarter from ratcheting the whole city into
+  // the Shimmering on its own. Districts still leak magic, just at a half-pace
+  // the reversion overpowers (one quarter parks magic in the 60s); it takes a
+  // genuinely magic-soaked city — several quarters — to approach the singularity.
+  let magic = s.magic + (50 - s.magic) * 0.02 + rng.range(-0.5, 0.5);
+  magic += countOf('magical') * 0.15;
   if (factionHappy('mages')) magic += 0.15;
 
-  // Food from productive districts versus mouths to feed.
-  let food = s.food;
+  // Food from productive districts versus mouths to feed. Stores also drift
+  // back toward a workaday 50 — surplus spoils and granaries only hold so much —
+  // so a well-fed city sits comfortably stocked rather than perpetually
+  // overflowing, while a strained one is gently buoyed off starvation.
+  let food = s.food + (50 - s.food) * 0.02;
   food += countOf('harbor') * 0.25 + countOf('forest-edge') * 0.2 + countOf('garden') * 0.2;
   food += 0.15; // baseline farms outside the walls
   food -= s.population / 9000;
   if (s.pollution > 70) food -= 0.3;
 
-  // Housing decays with growth, improves with infrastructure.
-  let housing = s.housing - s.population / 22000;
+  // Housing decays with growth, improves with infrastructure. The crowding
+  // drain is gentle, and a reversion toward 45 acts as a recovery floor: when
+  // housing is low, people make do and the slide self-arrests (at housing 20
+  // it adds +0.25/day), so a neglected city stays scruffy rather than emptying.
+  let housing = s.housing - s.population / 40000 + (45 - s.housing) * 0.01;
   if (s.infrastructure > 60) housing += 0.25;
   if (factionHappy('workers')) housing += 0.1;
 
-  // Infrastructure rusts unless someone maintains it.
-  let infrastructure = s.infrastructure - 0.18;
+  // Infrastructure rusts unless someone maintains it, but a reversion toward 40
+  // keeps the rust from grinding all the way to zero (at infra 10 it adds
+  // +0.30/day) — engineer-friendly play still clearly wins, neglect just rots
+  // to shabby, not to ruin.
+  let infrastructure = s.infrastructure - 0.12 + (40 - s.infrastructure) * 0.01;
   if (factionHappy('engineers')) infrastructure += 0.3;
   if (s.wealth > 65) infrastructure += 0.15;
   if (s.chaos > 70) infrastructure -= 0.3;
 
-  // Culture grows around festivals and academies.
-  let culture = s.culture + (40 - s.culture) * 0.008;
-  culture += countOf('festival') * 0.2 + countOf('academy') * 0.15;
+  // Culture grows around festivals and academies, but tastes drift firmly back
+  // toward an ordinary middle: without sustained patronage a city settles in
+  // the low 60s rather than coasting up to a golden age on a single venue's
+  // inertia.
+  let culture = s.culture + (50 - s.culture) * 0.03;
+  culture += countOf('festival') * 0.18 + countOf('academy') * 0.12;
   if (factionHappy('street-performers')) culture += 0.15;
 
   // Wealth: trade districts earn, beauty/culture attract spenders, chaos costs.
-  let wealth = s.wealth;
-  wealth += countOf('market') * 0.25 + countOf('harbor') * 0.2;
+  // Coffers revert firmly toward a comfortable 60 — fortunes are spent as fast
+  // as they're made unless real trade keeps earning, so an idle city's purse
+  // settles in the 60s-70s instead of pinning at 100 and tipping into the
+  // Golden Age on its own.
+  let wealth = s.wealth + (60 - s.wealth) * 0.04;
+  wealth += countOf('market') * 0.18 + countOf('harbor') * 0.18;
   const tourism = (s.culture + s.beauty - 100) * 0.008;
   if (tourism > 0) wealth += tourism;
   if (s.chaos > 60) wealth -= 0.4;
@@ -428,6 +466,9 @@ function updateRisks(city: City, rng: Rng): void {
 }
 
 function rollDisasters(city: City, rng: Rng, headlines: NewsItem[]): void {
+  // A fair start: no disaster strikes in the first stretch, so a young city
+  // never gets gut-punched before it has found its feet.
+  if (city.day < 20) return;
   for (const risk of city.risks) {
     if (risk.level < 60) continue;
     const probability = (risk.level - 60) / 350; // up to ~11% per day at level 100

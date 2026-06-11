@@ -39,7 +39,8 @@ Ages give this existing staging a *name, a face, and a UI*.
    survived) rather than razor-edge stat checks, so every surviving run eventually
    progresses. A relaxed pace: a typical run should see Town around the midgame and
    have a shot at the Wonder Age by the late game. Advancement check joins the daily
-   tick deterministically.
+   tick deterministically. There is no intended hard day cap; the city should be able
+   to keep living and growing indefinitely unless an outcome ends the run.
 3. **Unlocks per age**: events gain an optional `minAge` (analogous to `minDay`);
    some projects become age-gated; new headlines per age. Write a handful of
    age-specific events (a Village's first tavern brawl; a Town charter dispute; City

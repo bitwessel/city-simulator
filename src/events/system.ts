@@ -143,8 +143,13 @@ export function applyStatDelta(
   delta: StatDelta,
   options: { trustDampened?: boolean } = {},
 ): void {
+  // Low trust dampens the positive half of a choice, but never below half
+  // effect: even a city that doesn't believe in you still feels at least 50% of
+  // a good policy. This floors the old trust death-loop (struggling city → trust
+  // falls → your help stops working → more struggle) so the player's hand always
+  // matters. See prompts/02-relaxed-balance.md requirement 3.
   const dampen = options.trustDampened
-    ? Math.max(0.4, Math.min(1, city.stats.trust / 60))
+    ? Math.max(0.5, Math.min(1, city.stats.trust / 60))
     : 1;
   for (const [key, raw] of Object.entries(delta)) {
     const statKey = key as StatKey;

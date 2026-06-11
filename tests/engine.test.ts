@@ -131,7 +131,7 @@ describe('simulation engine', () => {
 
   it('dampens positive (but not negative) effects when trust is low', () => {
     const city = freshCity('dampen-test');
-    city.stats.trust = 0; // dampen factor floors at 0.4
+    city.stats.trust = 0; // dampen factor floors at 0.5 (phase-02 play-matters cap)
     city.stats.happiness = 50;
     city.stats.wealth = 50;
     const event: ActiveEvent = {
@@ -151,7 +151,9 @@ describe('simulation engine', () => {
       ],
     };
     const { city: next } = applyEventChoice(city, event, 'c');
-    expect(next.stats.happiness).toBeCloseTo(54, 5); // 10 * 0.4
+    // Floor raised 0.4 → 0.5 in phase 02 so the player's hand always retains at
+    // least half effect even in a fully distrustful city (50 + 10 * 0.5).
+    expect(next.stats.happiness).toBeCloseTo(55, 5); // 10 * 0.5
     expect(next.stats.wealth).toBeCloseTo(40, 5); // negatives bite in full
   });
 

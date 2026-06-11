@@ -55,6 +55,9 @@ don't build it.
    forever. This enables shareable seeds, the test suite, and the worldsmith pipeline.
 5. **The city remembers.** Names, choices, and history resurface. Attachment over
    mechanics.
+6. **No calendar fail state.** A city is not supposed to die because a clock hit a
+   fixed day count. Runs may end from outcomes, but there is no built-in 99/100-day
+   ceiling on how long a city can continue.
 
 ## Roadmap (build order matters)
 
