@@ -1,5 +1,7 @@
 // Visual spot-check: generate a few seeded cities and screenshot the 3D view.
-// Usage: node scripts/visual-check.mjs   (dev server on :5173)
+// Usage: node scripts/visual-check.mjs [--headed] [seeds...]   (dev server on :5173)
+// --headed runs a visible browser on the real GPU — required to see the
+// post-processing chain (headless = SwiftShader, where the app disables it).
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
 
@@ -15,10 +17,13 @@ try {
   process.exit(1);
 }
 
-const browser = await chromium.launch();
+const argv = process.argv.slice(2);
+const headed = argv.includes('--headed');
+const seeds = argv.filter((a) => a !== '--headed');
+
+const browser = await chromium.launch({ headless: !headed });
 const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
 
-const seeds = process.argv.slice(2);
 const list = seeds.length > 0 ? seeds : ['smoke-test-city', 'emberwick', 'dragon-99'];
 
 for (const seed of list) {

@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useRef } from 'react';
-import { Canvas, useThree } from '@react-three/fiber';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
-import { Color, Fog, type Scene } from 'three';
+import { Bloom, EffectComposer, N8AO, FXAA, ToneMapping, Vignette } from '@react-three/postprocessing';
+import { ToneMappingMode } from 'postprocessing';
+import { ACESFilmicToneMapping, Color, Fog, type Scene, type WebGLRenderer } from 'three';
 import type { City } from '../types';
 import { Districts } from './Districts';
 import { Roads } from './Roads';
@@ -9,6 +11,9 @@ import { Terrain } from './Terrain';
 import { Scenery } from './Scenery';
 import { Atmosphere } from './Atmosphere';
 import { Citizens } from './Citizens';
+import { Lanterns } from './Lanterns';
+import { ChimneySmoke } from './ChimneySmoke';
+import { DaylightRig } from './DaylightRig';
 import { terrainHeightAt } from '../generation/terrain';
 import { MOOD_THEMES } from './palette';
 
@@ -16,6 +21,9 @@ export interface CitySceneProps {
   city: City;
   selectedDistrictId: string | null;
   onSelectDistrict: (id: string | null) => void;
+  /** In-game days per real second (0 while paused/reading/ended) — drives the
+   *  day/night cycle so the sun freezes exactly when the simulation does. */
+  clockRate: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -60,6 +68,87 @@ function SceneFog({ moodKey, extent }: { moodKey: keyof typeof MOOD_THEMES; exte
   return null;
 }
 
+/** True when WebGL is software-emulated (SwiftShader/llvmpipe — headless CI,
+ *  GPU-less VMs). The post chain is unusably slow there, so PostFX skips it
+ *  and tone mapping falls back to the renderer. */
+function isSoftwareRenderer(gl: WebGLRenderer): boolean {
+  try {
+    const ctx = gl.getContext();
+    const ext = ctx.getExtension('WEBGL_debug_renderer_info');
+    const name = String(
+      ctx.getParameter(ext ? ext.UNMASKED_RENDERER_WEBGL : ctx.RENDERER),
+    );
+    return /swiftshader|llvmpipe|software/i.test(name);
+  } catch {
+    return false;
+  }
+}
+
+/** Post chain: AO grounds the low-poly shapes, bloom lifts emissives (windows
+ *  at night, magic, lanterns), a soft vignette frames the diorama, ACES
+ *  tone-maps the HDR result and FXAA smooths the edges. Skipped entirely on
+ *  software renderers (`?nofx` in the URL forces the same for A/B checks). */
+function PostFX() {
+  const gl = useThree((s) => s.gl);
+  const enabled = useMemo(
+    () => !isSoftwareRenderer(gl) && !new URLSearchParams(location.search).has('nofx'),
+    [gl],
+  );
+  // Adaptive budget, degrade-only: stage 0 = full chain, 1 = no AO (N8AO
+  // re-renders the scene for depth/normals — a fixed ~15ms on weak iGPUs no
+  // matter the sample counts), 2 = no AO and no FXAA. Whenever two consecutive
+  // 3s windows can't hold ~30fps, step down a stage; capable GPUs never
+  // trigger this. Bloom/vignette/tonemap measured ~free, so they always stay.
+  const [stage, setStage] = useState(0);
+  const probe = useRef({ warmup: 2, t: 0, frames: 0, slow: 0 });
+
+  useFrame((_, delta) => {
+    if (!enabled || stage >= 2) return;
+    const p = probe.current;
+    if (p.warmup > 0) {
+      p.warmup -= delta;
+      return;
+    }
+    p.t += delta;
+    p.frames += 1;
+    if (p.t < 3) return;
+    const fps = p.frames / p.t;
+    p.t = 0;
+    p.frames = 0;
+    if (fps < 30) {
+      p.slow += 1;
+      if (p.slow >= 2) {
+        p.slow = 0;
+        p.warmup = 1; // let the lighter chain settle before judging again
+        setStage((s) => s + 1);
+        console.info(
+          `[postfx] stepping down post-processing (sustained ~${fps.toFixed(0)}fps)`,
+        );
+      }
+    } else {
+      p.slow = 0;
+    }
+  });
+
+  if (!enabled) return null;
+  // Built as an array: EffectComposer's children type forbids conditional
+  // holes (and even JSX comments). Bloom's threshold is in pre-tonemap linear
+  // space — sunlit walls already reach ~1, so anything below ~1.5 veils the
+  // whole scene in haze.
+  const effects = [
+    <Bloom key="bloom" mipmapBlur intensity={0.4} luminanceThreshold={1.6} luminanceSmoothing={0.3} />,
+    <Vignette key="vignette" eskil={false} offset={0.26} darkness={0.33} />,
+    <ToneMapping key="tonemap" mode={ToneMappingMode.ACES_FILMIC} />,
+  ];
+  if (stage < 2) effects.push(<FXAA key="fxaa" />);
+  if (stage < 1) {
+    effects.unshift(
+      <N8AO key="ao" quality="performance" halfRes aoRadius={2} distanceFalloff={1} intensity={2.4} />,
+    );
+  }
+  return <EffectComposer multisampling={0}>{effects}</EffectComposer>;
+}
+
 interface StaticCityProps {
   city: City;
   selectedDistrictId: string | null;
@@ -83,7 +172,7 @@ function StaticCity({ city, selectedDistrictId, onSelectDistrict, moodKey }: Sta
   );
 }
 
-export function CityScene({ city, selectedDistrictId, onSelectDistrict }: CitySceneProps) {
+export function CityScene({ city, selectedDistrictId, onSelectDistrict, clockRate }: CitySceneProps) {
   const moodKey = city.mood as keyof typeof MOOD_THEMES;
   const theme = MOOD_THEMES[moodKey] ?? MOOD_THEMES.serene;
 
@@ -137,15 +226,24 @@ export function CityScene({ city, selectedDistrictId, onSelectDistrict }: CitySc
   return (
     <Canvas
       shadows
+      // `flat` defers tone mapping to the composer's ACES pass, so the scene
+      // reaches the effects in linear HDR (bloom needs the headroom). On
+      // software renderers PostFX is skipped and onCreated restores ACES at
+      // the renderer instead.
+      flat
       camera={{
         position: [center.x, frame * 1.05, center.z + frame * 1.35],
         fov: 42,
       }}
       gl={{ antialias: true }}
+      onCreated={({ gl }) => {
+        if (isSoftwareRenderer(gl)) gl.toneMapping = ACESFilmicToneMapping;
+      }}
       onPointerMissed={() => onSelectDistrict(null)}
       style={{ position: 'absolute', inset: 0 }}
     >
       <SceneFog moodKey={moodKey} extent={extent} />
+      <DaylightRig theme={theme} clockRate={clockRate} initialDay={city.day} />
       <Atmosphere
         mood={city.mood}
         stats={city.stats}
@@ -161,6 +259,8 @@ export function CityScene({ city, selectedDistrictId, onSelectDistrict }: CitySc
         onSelectDistrict={onSelectDistrict}
         moodKey={moodKey}
       />
+      <Lanterns city={city} />
+      <ChimneySmoke city={city} />
       <Citizens city={city} />
       <OrbitControls
         enablePan
@@ -172,6 +272,7 @@ export function CityScene({ city, selectedDistrictId, onSelectDistrict }: CitySc
         maxPolarAngle={Math.PI / 2.3}
         target={[center.x, targetY, center.z]}
       />
+      <PostFX />
     </Canvas>
   );
 }

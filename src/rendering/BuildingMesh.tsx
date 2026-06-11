@@ -110,6 +110,10 @@ function windowStrip(
             color={'#fff2c4'}
             emissive={glow}
             emissiveIntensity={glowI * lit}
+            userData={{
+              glowDay: glowI * lit,
+              glowNight: Math.min(3, glowI * lit * 2.2 + 1.1),
+            }}
             toneMapped={false}
             roughness={0.5}
             metalness={0}
@@ -148,6 +152,17 @@ function buildKind(building: Building, p: BuildingPalette) {
           </mesh>
           <mesh geometry={UNIT_BOX} position={[0, 0.25, 0.52]} scale={[0.22, 0.4, 0.1]}>
             <meshStandardMaterial color={trim} {...MAT} />
+          </mesh>
+          {/* a small hearth window that lights up after dusk */}
+          <mesh geometry={UNIT_BOX} position={[0.3, 0.5, 0.51]} scale={[0.2, 0.22, 0.04]}>
+            <meshStandardMaterial
+              color={'#ffe6a8'}
+              emissive={'#ffcf6b'}
+              emissiveIntensity={glowI * 0.3}
+              userData={{ glowDay: glowI * 0.3, glowNight: 1.9 }}
+              toneMapped={false}
+              {...MAT}
+            />
           </mesh>
         </group>
       );
@@ -244,14 +259,34 @@ function buildKind(building: Building, p: BuildingPalette) {
           </mesh>
           {/* hanging sign — lit */}
           <mesh geometry={UNIT_BOX} position={[0.7, 0.7, 0.5]} scale={[0.3, 0.3, 0.05]}>
-            <meshStandardMaterial color={accent} emissive={glow} emissiveIntensity={0.2 + glowI * 0.5} {...MAT} />
+            <meshStandardMaterial
+              color={accent}
+              emissive={glow}
+              emissiveIntensity={0.2 + glowI * 0.5}
+              userData={{ glowDay: 0.2 + glowI * 0.5, glowNight: 1.7 }}
+              {...MAT}
+            />
           </mesh>
           {/* warm window glows */}
           <mesh geometry={UNIT_BOX} position={[-0.3, 0.45, 0.51]} scale={[0.22, 0.26, 0.04]}>
-            <meshStandardMaterial color={'#ffe6a8'} emissive={'#ffcf6b'} emissiveIntensity={glowI * 0.8} toneMapped={false} {...MAT} />
+            <meshStandardMaterial
+              color={'#ffe6a8'}
+              emissive={'#ffcf6b'}
+              emissiveIntensity={glowI * 0.8}
+              userData={{ glowDay: glowI * 0.8, glowNight: 2.3 }}
+              toneMapped={false}
+              {...MAT}
+            />
           </mesh>
           <mesh geometry={UNIT_BOX} position={[0.25, 0.45, 0.51]} scale={[0.22, 0.26, 0.04]}>
-            <meshStandardMaterial color={'#ffe6a8'} emissive={'#ffcf6b'} emissiveIntensity={glowI * 0.8} toneMapped={false} {...MAT} />
+            <meshStandardMaterial
+              color={'#ffe6a8'}
+              emissive={'#ffcf6b'}
+              emissiveIntensity={glowI * 0.8}
+              userData={{ glowDay: glowI * 0.8, glowNight: 2.3 }}
+              toneMapped={false}
+              {...MAT}
+            />
           </mesh>
         </group>
       );
@@ -288,6 +323,19 @@ function buildKind(building: Building, p: BuildingPalette) {
           <mesh geometry={UNIT_BOX} position={[0, 1.2, 0]} scale={[1.8, 0.18, 1.3]}>
             <meshStandardMaterial color={trim} {...MAT} />
           </mesh>
+          {/* tall parlor windows that light up after dusk */}
+          {[-0.45, 0.45].map((x) => (
+            <mesh key={`mw-${x}`} geometry={UNIT_BOX} position={[x, 0.6, 0.61]} scale={[0.24, 0.42, 0.04]}>
+              <meshStandardMaterial
+                color={'#ffe6a8'}
+                emissive={'#ffcf6b'}
+                emissiveIntensity={glowI * 0.35}
+                userData={{ glowDay: glowI * 0.35, glowNight: 2.0 }}
+                toneMapped={false}
+                {...MAT}
+              />
+            </mesh>
+          ))}
           {/* hipped roof + dome */}
           <mesh geometry={UNIT_CONE} position={[0, 1.55, 0]} rotation={[0, Math.PI / 4, 0]} scale={[2, 0.5, 1.5]}>
             <meshStandardMaterial color={accent} {...MAT} />
@@ -754,7 +802,14 @@ function buildKind(building: Building, p: BuildingPalette) {
           {/* window rows behind the columns */}
           {Array.from({ length: floors }, (_, r) => (
             <mesh key={`gw-${r}`} geometry={UNIT_BOX} position={[0, 0.3 + FLOOR_HEIGHT * (r + 0.5), halfD - 0.02]} scale={[halfW * 1.7, FLOOR_HEIGHT * 0.4, 0.04]}>
-              <meshStandardMaterial color={'#ffe8b8'} emissive={'#ffce78'} emissiveIntensity={glowI * 0.85} toneMapped={false} {...MAT} />
+              <meshStandardMaterial
+                color={'#ffe8b8'}
+                emissive={'#ffce78'}
+                emissiveIntensity={glowI * 0.85}
+                userData={{ glowDay: glowI * 0.85, glowNight: 2.4 }}
+                toneMapped={false}
+                {...MAT}
+              />
             </mesh>
           ))}
           {/* entablature */}
@@ -775,7 +830,13 @@ function buildKind(building: Building, p: BuildingPalette) {
             </mesh>
             {/* clock face */}
             <mesh geometry={UNIT_CYLINDER} position={[0, bodyH * 1.4 + 1.1, 0.22]} rotation={[Math.PI / 2, 0, 0]} scale={[0.26, 0.04, 0.26]}>
-              <meshStandardMaterial color={'#fff4d8'} emissive={'#ffe6a0'} emissiveIntensity={glowI * 1.0} toneMapped={false} />
+              <meshStandardMaterial
+                color={'#fff4d8'}
+                emissive={'#ffe6a0'}
+                emissiveIntensity={glowI * 1.0}
+                userData={{ glowDay: glowI * 1.0, glowNight: 2.2 }}
+                toneMapped={false}
+              />
             </mesh>
             <mesh geometry={UNIT_CONE} position={[0, bodyH * 1.4 + 1.6, 0]} scale={[0.6, 0.6, 0.6]}>
               <meshStandardMaterial color={accent} {...MAT} />

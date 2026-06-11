@@ -1,5 +1,5 @@
 import type { City } from '../types';
-import { useGameStore } from '../state/store';
+import { SPEED_OPTIONS, useGameStore } from '../state/store';
 import { CityScene } from '../rendering/CityScene';
 import { TopBar } from './TopBar';
 import { LeftPanel } from './LeftPanel';
@@ -14,8 +14,13 @@ export function GameScreen({ city }: { city: City }) {
   const runId = useGameStore((s) => s.runId);
   const activeEvent = useGameStore((s) => s.activeEvent);
   const eventOpen = useGameStore((s) => s.eventOpen);
+  const speed = useGameStore((s) => s.speed);
   const selectedDistrictId = useGameStore((s) => s.selectedDistrictId);
   const selectDistrict = useGameStore((s) => s.selectDistrict);
+
+  // Mirrors useGameClock's hold conditions so the day/night sun freezes
+  // exactly when the simulation clock does.
+  const clockRate = eventOpen || city.outcome ? 0 : SPEED_OPTIONS[speed];
 
   return (
     <div className="game">
@@ -26,6 +31,7 @@ export function GameScreen({ city }: { city: City }) {
           city={city}
           selectedDistrictId={selectedDistrictId}
           onSelectDistrict={selectDistrict}
+          clockRate={clockRate}
         />
       </div>
 

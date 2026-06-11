@@ -3,10 +3,12 @@ import { useFrame } from '@react-three/fiber';
 import type {
   DirectionalLight,
   Group,
+  HemisphereLight,
   Mesh,
   Object3D,
   Points,
   Sprite,
+  SpriteMaterial,
 } from 'three';
 import {
   BufferGeometry,
@@ -17,17 +19,18 @@ import {
 } from 'three';
 import { LOWPOLY_SPHERE } from './shared';
 import { hashFloat } from './hash';
+import { DAYLIGHT } from './daylight';
 import type { MoodTheme } from './palette';
 import type { CityMood, CityStats } from '../types';
 
 // ---------------------------------------------------------------------------
 // Atmosphere — the state-driven showpiece.
 //
-//   * Lighting & fog come from the mood theme (set in CityScene; the arcane
-//     pulse lives here on the directional light ref). Soft shadows + a high
-//     ambient floor keep every mood luminous.
-//   * Drifting low-poly clouds + a handful of instanced circling birds + a soft
-//     sun-glow sprite add charm and depth.
+//   * Lighting follows the DAYLIGHT snapshot (mood theme modulated by the
+//     day/night cycle): the sun wheels across the sky, dusk warms, night hands
+//     over to cool moonlight. The arcane/chaotic pulses ride on top.
+//   * Drifting low-poly clouds + a handful of instanced circling birds + a
+//     sun-glow sprite (which tracks the sun and pales into a moon at night).
 //   * Smog puffs (pollution > 55) and magic sparkles (magic > 55) react to
 //     stats.
 //
@@ -175,6 +178,7 @@ function Clouds({ theme, extent }: { theme: MoodTheme; extent: number }) {
                 color={'#ffffff'}
                 emissive={theme.fog}
                 emissiveIntensity={0.25}
+                userData={{ glowDay: 0.25, glowNight: 0.05 }}
                 transparent
                 opacity={0.85}
                 depthWrite={false}
@@ -266,27 +270,34 @@ function SunGlow({ theme, extent }: { theme: MoodTheme; extent: number }) {
   const tex = useMemo(() => makeGlowTexture(), []);
   useEffect(() => () => tex.dispose(), [tex]);
 
-  // Place the glow far away along the sun direction.
-  const dir = theme.sunPosition;
-  const dlen = Math.hypot(dir[0], dir[1], dir[2]) || 1;
   const dist = Math.max(220, extent * 3.2);
-  const pos: [number, number, number] = [
-    (dir[0] / dlen) * dist,
-    (dir[1] / dlen) * dist * 0.9,
-    (dir[2] / dlen) * dist,
-  ];
   const size = Math.max(120, extent * 1.6);
 
+  // The glow rides the animated sun: low and huge at golden hour, high at
+  // noon, and at night it shrinks into a pale moon-glow along the moon dir.
   useFrame((state) => {
-    if (spriteRef.current) {
-      const t = state.clock.elapsedTime;
-      const s = size * (1 + Math.sin(t * 0.4) * 0.04);
-      spriteRef.current.scale.set(s, s, 1);
-    }
+    const sprite = spriteRef.current;
+    if (!sprite) return;
+    const t = state.clock.elapsedTime;
+    const night = DAYLIGHT.nightness;
+    const s =
+      size *
+      (1 + Math.sin(t * 0.4) * 0.04) *
+      (1 + DAYLIGHT.golden * 0.25) *
+      (1 - night * 0.55);
+    sprite.scale.set(s, s, 1);
+    sprite.position.set(
+      DAYLIGHT.sunDir.x * dist,
+      Math.max(DAYLIGHT.sunDir.y * dist * 0.9, 12),
+      DAYLIGHT.sunDir.z * dist,
+    );
+    const mat = sprite.material as SpriteMaterial;
+    mat.color.copy(DAYLIGHT.sunColor);
+    mat.opacity = 0.7 * Math.max(0.35 + 0.65 * DAYLIGHT.dayness, night * 0.55);
   });
 
   return (
-    <sprite ref={spriteRef} position={pos} scale={[size, size, 1]}>
+    <sprite ref={spriteRef} scale={[size, size, 1]}>
       <spriteMaterial
         map={tex}
         color={theme.sun}
@@ -371,29 +382,52 @@ function MagicSparkles({ magic, extent }: SparklesProps) {
   );
 }
 
-// ----- Lights (with arcane pulse) ------------------------------------------
+// ----- Lights (day/night driven, with arcane pulse) -------------------------
 
 function MoodLights({ mood, theme }: { mood: CityMood; theme: MoodTheme }) {
   const sunRef = useRef<DirectionalLight>(null);
-  const baseIntensity = theme.sunIntensity;
+  const fillRef = useRef<DirectionalLight>(null);
+  const hemiRef = useRef<HemisphereLight>(null);
 
+  // Every frame: copy the DAYLIGHT snapshot (theme already folded in by the
+  // rig) onto the lights, then layer the mood pulses on the sun.
   useFrame((state) => {
-    const sun = sunRef.current;
-    if (!sun) return;
+    const t = state.clock.elapsedTime;
+    let pulse = 1;
     if (mood === 'arcane') {
-      const t = state.clock.elapsedTime;
-      sun.intensity = baseIntensity * (1 + Math.sin(t * 0.8) * 0.12);
+      pulse = 1 + Math.sin(t * 0.8) * 0.12;
     } else if (mood === 'chaotic') {
-      const t = state.clock.elapsedTime;
-      sun.intensity = baseIntensity * (1 + Math.sin(t * 5.3) * 0.05 + Math.sin(t * 11.7) * 0.025);
-    } else if (sun.intensity !== baseIntensity) {
-      sun.intensity = baseIntensity;
+      pulse = 1 + Math.sin(t * 5.3) * 0.05 + Math.sin(t * 11.7) * 0.025;
+    }
+
+    const sun = sunRef.current;
+    if (sun) {
+      sun.position.copy(DAYLIGHT.sunDir).multiplyScalar(140);
+      sun.color.copy(DAYLIGHT.sunColor);
+      sun.intensity = DAYLIGHT.sunIntensity * pulse;
+    }
+    const fill = fillRef.current;
+    if (fill) {
+      fill.position.set(
+        -DAYLIGHT.sunDir.x * 140,
+        Math.max(DAYLIGHT.sunDir.y, 0.35) * 84,
+        -DAYLIGHT.sunDir.z * 140,
+      );
+      fill.color.copy(DAYLIGHT.ambientColor);
+      fill.intensity = DAYLIGHT.fillIntensity;
+    }
+    const hemi = hemiRef.current;
+    if (hemi) {
+      hemi.color.copy(DAYLIGHT.ambientColor);
+      hemi.groundColor.copy(DAYLIGHT.groundColor);
+      hemi.intensity = DAYLIGHT.ambientIntensity;
     }
   });
 
   return (
     <>
       <hemisphereLight
+        ref={hemiRef}
         color={theme.ambient}
         groundColor={theme.groundTint}
         intensity={theme.ambientIntensity}
@@ -401,7 +435,7 @@ function MoodLights({ mood, theme }: { mood: CityMood; theme: MoodTheme }) {
       <directionalLight
         ref={sunRef}
         color={theme.sun}
-        intensity={baseIntensity}
+        intensity={theme.sunIntensity}
         position={theme.sunPosition}
         castShadow
         shadow-mapSize-width={2048}
@@ -417,8 +451,9 @@ function MoodLights({ mood, theme }: { mood: CityMood; theme: MoodTheme }) {
       />
       {/* Cool fill from the opposite side keeps shadows from going pure black. */}
       <directionalLight
+        ref={fillRef}
         color={theme.ambient}
-        intensity={baseIntensity * 0.35}
+        intensity={theme.sunIntensity * 0.35}
         position={[-theme.sunPosition[0], theme.sunPosition[1] * 0.6, -theme.sunPosition[2]]}
       />
     </>

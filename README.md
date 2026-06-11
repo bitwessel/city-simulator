@@ -21,6 +21,17 @@ npm run preview    # serve the production build
 
 No backend, no accounts, no telemetry. Everything runs in the browser.
 
+## Deploying to GitHub Pages
+
+This repo can run on GitHub Pages because it builds to a static `dist/` folder.
+
+1. Keep the Vite base path set to `/city-simulator/` in [vite.config.ts](vite.config.ts).
+2. Push the repo to GitHub and create a `.github/workflows/deploy-pages.yml` workflow.
+3. Build with `npm run build`; GitHub Actions will publish the generated `dist/` folder.
+4. In the GitHub repo settings, set Pages source to the GitHub Actions workflow.
+
+If you rename the repository, update the Vite base path to match the new repo name.
+
 ## How to play
 
 1. On the start screen, optionally type a seed (any text) or leave it blank for a surprise.
