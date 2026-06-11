@@ -3,6 +3,7 @@ import { useGameStore } from '../state/store';
 import { DISTRICT_TYPE_META, RISK_META } from './statMeta';
 import { LabeledMeter, Meter } from './Meter';
 import { formatCount } from './format';
+import { CommissionSection } from './CommissionSection';
 
 function moodColor(mood: number): string {
   if (mood >= 60) return 'var(--mm-good)';
@@ -80,6 +81,8 @@ function DistrictDetail({ city, district }: { city: City; district: District }) 
           );
         })
       )}
+
+      <CommissionSection city={city} district={district} />
     </div>
   );
 }

@@ -308,4 +308,50 @@ export const HEADLINE_POOL: HeadlineTemplate[] = [
     weight: 9,
     condition: { minStats: { infrastructure: 75 } },
   },
+
+  // ----- Completed mayor-project landmarks ------------------------------------
+  // Gated on a finished project so the headline only appears once the landmark
+  // actually stands. Tone weights kept modest so they don't crowd the feed.
+  {
+    text: 'The fountain in {city} has been adopted by a colony of ducks who now charge a toll in breadcrumbs.',
+    tone: 'good',
+    weight: 7,
+    condition: { requiresCompletedProjectId: 'fountain-plaza' },
+  },
+  {
+    text: 'Visitors to the Whispering Grove report the trees are "definitely talking about us", and seem flattered.',
+    tone: 'weird',
+    weight: 7,
+    condition: { requiresCompletedProjectId: 'whispering-grove' },
+  },
+  {
+    text: 'The lighthouse keeper of {city} files a report reading simply: "All ships home. Lovely evening."',
+    tone: 'good',
+    weight: 7,
+    condition: { requiresCompletedProjectId: 'harbor-lighthouse' },
+  },
+  {
+    text: 'Scholars at the observatory announce the discovery of a new star; it turns out to be a very high lantern, but spirits remain high.',
+    tone: 'good',
+    weight: 6,
+    condition: { requiresCompletedProjectId: 'starlit-observatory' },
+  },
+  {
+    text: 'The bathhouse in {city} has settled three lawsuits, one feud, and a marriage proposal this week, all before noon.',
+    tone: 'good',
+    weight: 7,
+    condition: { requiresCompletedProjectId: 'public-bathhouse' },
+  },
+  {
+    text: 'The philosophical goat at the menagerie has refused another interview, deepening its mystique and its fan club.',
+    tone: 'weird',
+    weight: 6,
+    condition: { requiresCompletedProjectId: 'curious-menagerie' },
+  },
+  {
+    text: 'The moondial of {city} read the wrong time last night; the mages insist the moon was simply early.',
+    tone: 'weird',
+    weight: 6,
+    condition: { requiresCompletedProjectId: 'great-moondial' },
+  },
 ];

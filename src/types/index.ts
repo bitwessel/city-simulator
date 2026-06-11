@@ -100,7 +100,40 @@ export type BuildingKind =
   /** Fantasy high-rise of magic/learning (academy & magical only). `floors` ~6-14. */
   | 'arcane-spire'
   /** Tall civic landmark — grand stacked hall. `floors` ~4-9. Urban districts. */
-  | 'grand-hall';
+  | 'grand-hall'
+  // ----- Mayor-project landmarks (phase 03) ---------------------------------
+  // Commissioned through the projects system (`src/projects/`), never planned
+  // by the district roster generator. Landmarks read as *special* at the
+  // default camera distance: bigger, distinctive silhouette, slight emissive
+  // accent. Exactly one `ProjectDef` per kind.
+  | 'grove'
+  | 'fountain-plaza'
+  | 'lighthouse'
+  | 'observatory'
+  | 'bathhouse'
+  | 'amphitheater'
+  | 'menagerie'
+  | 'bell-tower'
+  | 'hedge-maze'
+  | 'hot-springs'
+  | 'aviary'
+  | 'moondial';
+
+/** Building kinds that only exist as commissioned mayor-project landmarks. */
+export const LANDMARK_BUILDING_KINDS: BuildingKind[] = [
+  'grove',
+  'fountain-plaza',
+  'lighthouse',
+  'observatory',
+  'bathhouse',
+  'amphitheater',
+  'menagerie',
+  'bell-tower',
+  'hedge-maze',
+  'hot-springs',
+  'aviary',
+  'moondial',
+];
 
 export interface Building {
   id: string;
@@ -129,6 +162,13 @@ export interface Building {
    * keep using `scale` alone for their (short) height.
    */
   floors?: number;
+  /**
+   * True while this building is a mayor-project construction site; the
+   * renderer draws scaffolding instead of the finished mesh. Cleared by the
+   * engine on the day the project completes. Project buildings always use
+   * `appearAt: 0` so the site is visible regardless of district development.
+   */
+  construction?: boolean;
 }
 
 export type RiskKind =
@@ -297,6 +337,63 @@ export interface Resource {
   trend: number;
 }
 
+// ----- Mayor projects (phase 03) ---------------------------------------------
+
+/**
+ * A commissionable landmark project — pure data, like event defs. The catalog
+ * lives in `src/projects/data/projects.ts` and is validated by pool tests.
+ */
+export interface ProjectDef {
+  id: string;
+  name: string;
+  /** Warm, slightly funny — match the event voice. */
+  flavor: string;
+  /** City Favor cost. */
+  cost: number;
+  /** Construction time in in-game days. */
+  buildDays: number;
+  /** District types this can be commissioned in; 'any' allows all. */
+  districtTypes: DistrictType[] | 'any';
+  /** The landmark kind placed in the world (one def per kind). */
+  building: BuildingKind;
+  /** One-shot stat effects on completion. Modest: ±2..6. */
+  completionEffects: StatDelta;
+  /** Tiny ongoing daily drift while the landmark stands (±0.05..0.2). */
+  dailyEffects?: StatDelta;
+  /** Faction satisfaction deltas on completion. */
+  factionEffects?: Partial<Record<FactionArchetype, number>>;
+  /** Mood/wealth nudges to the host district on completion. */
+  districtEffects?: { mood?: number; wealth?: number };
+}
+
+/**
+ * A player's project order — replayable input, recorded like `eventLog`.
+ * Placement derives from `hash(seed + ':project:' + day + ':' + defId)`.
+ */
+export interface ProjectOrder {
+  day: number;
+  districtId: string;
+  defId: string;
+}
+
+/** A commissioned project currently under construction. */
+export interface ActiveProject {
+  defId: string;
+  districtId: string;
+  /** The scaffolded `Building` already placed in the district. */
+  buildingId: string;
+  startDay: number;
+  /** The day the works finish and completion effects apply. */
+  completeDay: number;
+}
+
+/** A finished project — kept so headlines/events can reference the landmark. */
+export interface CompletedProject {
+  defId: string;
+  districtId: string;
+  day: number;
+}
+
 // ----- Events -------------------------------------------------------------------
 
 /**
@@ -310,6 +407,8 @@ export interface EventCondition {
   requiresQuirkId?: string;
   /** Requires a faction of this archetype with satisfaction <= value. */
   factionUnhappy?: { archetype: FactionArchetype; below: number };
+  /** Requires a completed mayor project with this def id somewhere in town. */
+  requiresCompletedProjectId?: string;
 }
 
 /** A chance-based follow-up rolled after a choice is made. */
@@ -487,6 +586,19 @@ export interface City {
    * falls back to flat ground at y=0 when absent).
    */
   terrain?: TerrainData;
+  /**
+   * City Favor — the slow-recharging resource spent on mayor projects
+   * (phase 03). Regenerates a little faster when trust/happiness are high;
+   * capped at roughly 1–2 banked projects. Optional so older states load
+   * (the engine treats `undefined` as the starting amount).
+   */
+  favor?: number;
+  /** Player project orders — replayable input, like `eventLog`. */
+  projectLog?: ProjectOrder[];
+  /** Projects currently under construction. */
+  activeProjects?: ActiveProject[];
+  /** Finished projects; headlines/events can reference these landmarks. */
+  completedProjects?: CompletedProject[];
 }
 
 // ----- Engine results -----------------------------------------------------------------------

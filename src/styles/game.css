@@ -654,6 +654,151 @@
   padding: var(--mm-sp-1) 0;
 }
 
+/* ===== MAYOR PROJECTS — commission flow (district panel) ===== */
+.commission {
+  margin-top: var(--mm-sp-4);
+  padding-top: var(--mm-sp-3);
+  border-top: 1px dashed var(--mm-glass-hairline);
+}
+.commission__lead {
+  font-size: var(--mm-fs-sm);
+  color: var(--mm-ink-soft);
+  line-height: 1.5;
+  margin: 0 0 var(--mm-sp-3);
+}
+
+/* Standing / rising landmarks — listed with pride, never as a countdown. */
+.commission__standing {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mm-sp-2);
+  margin-bottom: var(--mm-sp-3);
+}
+.project-live {
+  border: 1px solid var(--mm-glass-hairline);
+  border-radius: var(--mm-radius-sm);
+  padding: 9px 12px;
+  background: rgba(255, 255, 255, 0.4);
+}
+.project-live--building {
+  border-color: rgba(194, 145, 60, 0.45);
+  background: rgba(240, 199, 94, 0.14);
+}
+.project-live--done {
+  border-color: rgba(95, 167, 113, 0.4);
+  background: rgba(95, 167, 113, 0.1);
+}
+.project-live__name {
+  font-family: var(--mm-display);
+  font-weight: 600;
+  font-size: var(--mm-fs-base);
+  color: var(--mm-ink);
+}
+.project-live__note {
+  font-size: var(--mm-fs-sm);
+  color: var(--mm-ink-soft);
+  font-style: italic;
+  margin-top: 2px;
+}
+
+.commission__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mm-sp-3);
+}
+.project-opt {
+  border: 1px solid var(--mm-glass-hairline);
+  border-radius: var(--mm-radius-sm);
+  padding: 11px 13px;
+  background: rgba(255, 255, 255, 0.4);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.project-opt:hover {
+  border-color: var(--mm-brass);
+  background: rgba(255, 255, 255, 0.58);
+}
+.project-opt__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--mm-sp-2);
+}
+.project-opt__name {
+  font-family: var(--mm-display);
+  font-weight: 600;
+  font-size: var(--mm-fs-base);
+  color: var(--mm-ink);
+}
+.project-opt__cost {
+  font-weight: 800;
+  font-size: var(--mm-fs-sm);
+  color: var(--mm-brass);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.project-opt__flavor {
+  font-size: var(--mm-fs-sm);
+  color: var(--mm-ink-soft);
+  line-height: 1.45;
+  margin: 5px 0;
+}
+.project-opt__meta {
+  font-size: var(--mm-fs-xs);
+  color: var(--mm-ink-faint);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  margin-bottom: 6px;
+}
+.project-opt__start {
+  margin-top: 10px;
+  width: 100%;
+  font-size: var(--mm-fs-sm);
+}
+.project-opt__reason {
+  display: block;
+  margin-top: 6px;
+  font-size: var(--mm-fs-xs);
+  font-style: italic;
+  color: var(--mm-ink-faint);
+  line-height: 1.4;
+}
+
+/* Inline confirm step — gentle, no scary modal. */
+.project-opt__confirm {
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px dashed var(--mm-glass-hairline);
+}
+.project-opt__confirm-q {
+  display: block;
+  font-size: var(--mm-fs-sm);
+  font-weight: 700;
+  color: var(--mm-ink);
+  margin-bottom: 7px;
+}
+.project-opt__confirm-btns {
+  display: flex;
+  gap: var(--mm-sp-2);
+}
+.project-opt__go {
+  flex: 1;
+  font-size: var(--mm-fs-sm);
+}
+.project-opt__cancel {
+  font-size: var(--mm-fs-sm);
+}
+
+/* City Favor chip in the top bar — a calm sibling of the vital chips. */
+.favor-chip__icon {
+  color: var(--mm-brass);
+}
+.favor-chip__cap {
+  font-weight: 700;
+  font-size: var(--mm-fs-xs);
+  color: var(--mm-ink-faint);
+  margin-left: 1px;
+}
+
 /* ===== NEWS TICKER (bottom-right, auto-fading) ===== */
 .ticker {
   position: fixed;

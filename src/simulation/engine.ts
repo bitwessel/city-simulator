@@ -22,6 +22,8 @@ import { HEADLINE_POOL } from './data/headlines';
 import { checkOutcomes } from './outcomes';
 import { deriveCityMood } from './mood';
 import { maybeFoundDistrict } from './expansion';
+import { FAVOR_CAP, favorRegen, getFavor, getProjectDef } from '../projects/projects';
+import { applyFactionEffects, applyStatDelta } from '../events/system';
 
 // ---------------------------------------------------------------------------
 // The simulation engine. `simulateDay` is a pure function: given a city it
@@ -61,11 +63,17 @@ export function simulateDay(
   const rng = dayRng(city, 'tick');
   const headlines: NewsItem[] = [];
 
+  regenFavor(city);
   applyQuirkDrift(city);
+  applyProjectDrift(city);
   updateResources(city);
   updateCityStats(city, rng);
   updatePopulation(city, rng);
   updateDistricts(city, rng);
+  // Mayor projects: clear scaffolding and apply completion effects on the day
+  // the works finish. Runs after the daily drift so a freshly-completed
+  // landmark's effects land on top of the day's baseline.
+  tickConstruction(city, headlines);
   // City expansion: a thriving city may break ground on a new district. Uses a
   // dedicated deterministic sub-stream keyed off seed+day so it never perturbs
   // the main tick RNG sequence (and thus existing headline/event determinism).
@@ -128,6 +136,75 @@ function applyQuirkDrift(city: City): void {
       }
     }
   }
+}
+
+/**
+ * City Favor regenerates slowly each day — faster when the city loves its
+ * mayor (high trust + happiness). Treats undefined favor as the starting
+ * amount so older states load cleanly. Never overfills the cap.
+ */
+function regenFavor(city: City): void {
+  const current = getFavor(city);
+  city.favor = Math.min(FAVOR_CAP, Math.round((current + favorRegen(city)) * 100) / 100);
+}
+
+/**
+ * Tiny ongoing daily drift from every *completed* landmark, applied near the
+ * quirk drift it mirrors. Under-construction projects contribute nothing yet.
+ */
+function applyProjectDrift(city: City): void {
+  for (const completed of city.completedProjects ?? []) {
+    const def = getProjectDef(completed.defId);
+    if (!def?.dailyEffects) continue;
+    applyStatDelta(city, def.dailyEffects);
+  }
+}
+
+/**
+ * Advance construction. On the day a project's works finish, clear the
+ * building's scaffolding flag, apply its one-shot completion effects (stats,
+ * factions, host district), move it from activeProjects to completedProjects,
+ * and emit a celebratory headline naming the landmark and district.
+ */
+function tickConstruction(city: City, headlines: NewsItem[]): void {
+  const active = city.activeProjects ?? [];
+  if (active.length === 0) return;
+  const stillBuilding: typeof active = [];
+  for (const project of active) {
+    if (city.day < project.completeDay) {
+      stillBuilding.push(project);
+      continue;
+    }
+    const def = getProjectDef(project.defId);
+    const district = city.districts.find((d) => d.id === project.districtId);
+    // If the def or district has gone missing, just drop the active record.
+    if (!def || !district) continue;
+
+    const building = district.buildings.find((b) => b.id === project.buildingId);
+    if (building) building.construction = false;
+
+    applyStatDelta(city, def.completionEffects);
+    applyFactionEffects(city, def.factionEffects);
+    if (def.districtEffects) {
+      if (def.districtEffects.mood !== undefined) {
+        district.mood = clampStat(district.mood + def.districtEffects.mood);
+      }
+      if (def.districtEffects.wealth !== undefined) {
+        district.wealth = clampStat(district.wealth + def.districtEffects.wealth);
+      }
+    }
+
+    city.completedProjects = [
+      ...(city.completedProjects ?? []),
+      { defId: project.defId, districtId: project.districtId, day: city.day },
+    ];
+    headlines.push({
+      day: city.day,
+      text: `${def.name} is finished! ${district.name} gathers to admire it, and a ribbon is cut with great and slightly excessive ceremony.`,
+      tone: 'good',
+    });
+  }
+  city.activeProjects = stillBuilding;
 }
 
 function updateResources(city: City): void {

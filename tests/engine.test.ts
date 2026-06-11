@@ -3,8 +3,41 @@ import type { ActiveEvent, City } from '../src/types';
 import { applyEventChoice, lapseEvent, simulateDay } from '../src/simulation/engine';
 import { OUTCOME_DEFS } from '../src/simulation/outcomes';
 import { MAX_DISTRICTS } from '../src/simulation/expansion';
+import {
+  canStartProject,
+  commissionProject,
+  getProjectDef,
+  projectAllowsDistrict,
+} from '../src/projects/projects';
 import { autoplay, expectStatsValid, freshCity } from './helpers';
 import { distance } from '../src/utils/math';
+
+/**
+ * Drive a city for `days` days (events suppressed) while commissioning project
+ * orders on scheduled days — a scripted player including the new project input
+ * type. Returns the final city. Deterministic for a given seed + schedule.
+ */
+function runWithProjects(
+  seed: string,
+  days: number,
+  orders: { day: number; defId: string }[],
+): City {
+  let city = freshCity(seed);
+  city.favor = 24; // enough to afford a couple of commissions
+  for (let i = 0; i < days; i++) {
+    if (city.outcome) break;
+    for (const order of orders.filter((o) => o.day === city.day)) {
+      const def = getProjectDef(order.defId);
+      if (!def) continue;
+      const district = city.districts.find((d) => projectAllowsDistrict(def, d));
+      if (district && canStartProject(city, district.id, def.id).ok) {
+        city = commissionProject(city, district.id, def.id);
+      }
+    }
+    city = simulateDay(city, { suppressEvents: true }).city;
+  }
+  return city;
+}
 
 /**
  * Drive a city for `days` days under conditions favourable to expansion
@@ -88,6 +121,36 @@ describe('simulation engine', () => {
     const runA = autoplay(freshCity('diverge-a'), 60);
     const runB = autoplay(freshCity('diverge-b'), 60);
     expect(JSON.stringify(runA.stats)).not.toBe(JSON.stringify(runB.stats));
+  });
+
+  it('is deterministic with project orders: same seed + same projectLog replays identically', () => {
+    const orders = [
+      { day: 3, defId: 'fountain-plaza' },
+      { day: 9, defId: 'whispering-grove' },
+      { day: 15, defId: 'bell-tower' },
+    ];
+    const runA = runWithProjects('project-determinism', 60, orders);
+    const runB = runWithProjects('project-determinism', 60, orders);
+    expect(runA.stats).toEqual(runB.stats);
+    expect(runA.projectLog).toEqual(runB.projectLog);
+    expect(runA.completedProjects).toEqual(runB.completedProjects);
+    expect(runA.activeProjects).toEqual(runB.activeProjects);
+    expect(runA.favor).toBe(runB.favor);
+    expect(runA.news).toEqual(runB.news);
+    // Building placement (position/rotation/construction) is part of the replay.
+    const landmarksA = runA.districts.flatMap((d) => d.buildings.filter((b) => b.id.startsWith('proj-')));
+    const landmarksB = runB.districts.flatMap((d) => d.buildings.filter((b) => b.id.startsWith('proj-')));
+    expect(landmarksA).toEqual(landmarksB);
+    expect(landmarksA.length).toBeGreaterThan(0);
+  });
+
+  it('project orders actually change the run versus an identical project-free run', () => {
+    const orders = [{ day: 3, defId: 'fountain-plaza' }];
+    const withProjects = runWithProjects('project-vs-none', 40, orders);
+    const without = runWithProjects('project-vs-none', 40, []);
+    expect(withProjects.completedProjects?.length ?? 0).toBeGreaterThan(0);
+    expect(without.completedProjects?.length ?? 0).toBe(0);
+    expect(JSON.stringify(withProjects.stats)).not.toBe(JSON.stringify(without.stats));
   });
 
   it('applies event choice effects to stats and factions', () => {

@@ -347,8 +347,12 @@ function tallAppearFloor(kind: BuildingKind): number {
  * `center` that is at least `BUILDING_MIN_GAP` from every already-placed
  * building. Returns null if no clear spot is found within `attempts` tries,
  * so callers can skip rather than overlap (avoids z-fighting piles).
+ *
+ * Exported so the mayor-projects system reuses the exact same terrain/collision
+ * sampler when placing commissioned landmarks (it adds its own river/land
+ * guard on top via the terrain helpers).
  */
-function sampleBuildingPosition(
+export function sampleBuildingPosition(
   rng: Rng,
   center: { x: number; z: number },
   maxR: number,

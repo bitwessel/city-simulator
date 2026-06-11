@@ -1,57 +1,16 @@
-import type { ActiveEvent, City, EventChoice, FactionArchetype, StatKey } from '../types';
+import type { ActiveEvent, City, EventChoice } from '../types';
 import { useGameStore } from '../state/store';
-import { DISTRICT_TYPE_META, FACTION_META, deltaIsPositive, metaForStat } from './statMeta';
-import { formatSigned } from './format';
-
-interface ChipData {
-  label: string;
-  good: boolean | null; // null = neutral
-}
-
-function chipClass(good: boolean | null): string {
-  if (good === null) return 'chip chip--neutral';
-  return good ? 'chip chip--good' : 'chip chip--bad';
-}
+import { DISTRICT_TYPE_META, FACTION_META } from './statMeta';
+import { EffectChips, buildEffectChips } from './EffectChips';
 
 /** Build the preview chips for a single choice from its stat & faction effects. */
-function effectChips(choice: EventChoice): ChipData[] {
-  const chips: ChipData[] = [];
-
-  // Bounded stats + population.
-  const effects = choice.effects ?? {};
-  for (const [k, v] of Object.entries(effects) as [StatKey, number][]) {
-    if (!v) continue;
-    const meta = metaForStat(k);
-    chips.push({
-      label: `${meta.icon} ${meta.label} ${formatSigned(v)}`,
-      good: deltaIsPositive(k, v),
-    });
-  }
-
-  // District nudges (mood / wealth / population). Higher is good for all three.
-  if (choice.districtEffects) {
-    const de = choice.districtEffects;
-    if (de.mood) chips.push({ label: `🏙️ Mood ${formatSigned(de.mood)}`, good: de.mood > 0 });
-    if (de.wealth) chips.push({ label: `🏙️ Wealth ${formatSigned(de.wealth)}`, good: de.wealth > 0 });
-    if (de.population)
-      chips.push({ label: `🏙️ Pop ${formatSigned(de.population)}`, good: de.population > 0 });
-  }
-
-  // Faction satisfaction nudges (higher = that faction is happier).
-  if (choice.factionEffects) {
-    for (const [arch, v] of Object.entries(choice.factionEffects) as [FactionArchetype, number][]) {
-      if (!v) continue;
-      const meta = FACTION_META[arch];
-      chips.push({ label: `${meta.icon} ${meta.label} ${formatSigned(v)}`, good: v > 0 });
-    }
-  }
-
-  // A chancy follow-up hangs in the air — flag it as an uncertain outcome.
-  if (choice.outcomes && choice.outcomes.length > 0) {
-    chips.push({ label: '🎲 Chance of consequences', good: null });
-  }
-
-  return chips;
+function effectChips(choice: EventChoice) {
+  return buildEffectChips({
+    effects: choice.effects,
+    districtEffects: choice.districtEffects,
+    factionEffects: choice.factionEffects,
+    hasChance: (choice.outcomes?.length ?? 0) > 0,
+  });
 }
 
 export function EventModal({ city, event }: { city: City; event: ActiveEvent }) {
@@ -115,15 +74,7 @@ export function EventModal({ city, event }: { city: City; event: ActiveEvent }) 
               >
                 <div className="choice__label">{choice.label}</div>
                 {choice.description && <div className="choice__desc">{choice.description}</div>}
-                {chips.length > 0 && (
-                  <div className="choice__chips">
-                    {chips.map((c, i) => (
-                      <span key={i} className={chipClass(c.good)}>
-                        {c.label}
-                      </span>
-                    ))}
-                  </div>
-                )}
+                <EffectChips chips={chips} />
               </button>
             );
           })}

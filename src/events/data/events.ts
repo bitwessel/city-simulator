@@ -2239,4 +2239,70 @@ export const EVENT_POOL: GameEventDef[] = [
       },
     ],
   },
+
+  // -------------------------------------------------------------------------
+  // MAYOR-PROJECT EVENTS — gated on a completed landmark (phase 03).
+  // These only become eligible once the named project actually stands, so the
+  // city's history resurfaces in its events. Plus one gentle, rare memo that
+  // simply *suggests* building something — pure flavor, no pressure.
+  // -------------------------------------------------------------------------
+  {
+    id: 'observatory-comet-watch',
+    title: 'The Observatory Has Spotted Something',
+    description:
+      'The astronomers at the observatory have trained their great brass telescope on a smudge of light and cannot agree what it is. Half call it a comet of fortune; the other half call it "a smudge". They request a public viewing night either way.',
+    tags: ['magic', 'culture'],
+    weight: 9,
+    condition: { requiresCompletedProjectId: 'starlit-observatory' },
+    choices: [
+      {
+        id: 'host-viewing',
+        label: 'Host a grand public viewing night',
+        description: 'Blankets, hot cider, and a great deal of pointing upward.',
+        effects: { culture: 5, happiness: 4, magic: 2 },
+        factionEffects: { archivists: 8, 'street-performers': 5 },
+        resultText: 'The whole city tilts its head back for an evening. The smudge waves back, possibly.',
+      },
+      {
+        id: 'quiet-study',
+        label: 'Let the scholars study it quietly first',
+        effects: { magic: 4, culture: 2, trust: 2 },
+        factionEffects: { archivists: 6, mages: 4 },
+        resultText: 'The astronomers keep their vigil. They will tell you what it is, eventually, in a very long paper.',
+      },
+      {
+        id: 'name-it',
+        label: 'Name it after the city and move on',
+        effects: { culture: 3, happiness: 2 },
+        factionEffects: { nobles: 4 },
+        resultText: 'The smudge is now officially "{city}\'s Star". It remains a smudge, but a patriotic one.',
+      },
+    ],
+  },
+  {
+    id: 'bathhouse-summit',
+    title: 'A Feud Is Being Settled at the Bathhouse',
+    description:
+      'Two guilds that have not spoken in years have, against all odds, ended up in the same warm pool at the bathhouse. Steam, it turns out, is a powerful diplomat. They are *this close* to an accord, and they would like a witness.',
+    tags: ['culture', 'faction'],
+    weight: 9,
+    condition: { requiresCompletedProjectId: 'public-bathhouse' },
+    choices: [
+      {
+        id: 'preside',
+        label: 'Preside over the bathhouse accord in person',
+        description: 'Bring a robe. Bring gravitas. Bring a robe.',
+        effects: { trust: 5, happiness: 4, chaos: -3 },
+        factionEffects: { workers: 8, merchants: 6 },
+        resultText: 'The accord is signed on a damp towel and holds beautifully. Surface tension, resolved.',
+      },
+      {
+        id: 'send-clerk',
+        label: 'Send a clerk to formalize it',
+        effects: { trust: 2, infrastructure: 2 },
+        factionEffects: { workers: 3 },
+        resultText: 'The clerk does an admirable job and is now, inexplicably, very relaxed about everything.',
+      },
+    ],
+  },
 ];

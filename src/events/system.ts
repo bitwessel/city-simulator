@@ -39,6 +39,12 @@ export function conditionMet(condition: EventCondition | undefined, city: City):
     );
     if (!f || f.satisfaction > condition.factionUnhappy.below) return false;
   }
+  if (condition.requiresCompletedProjectId) {
+    const built = (city.completedProjects ?? []).some(
+      (p) => p.defId === condition.requiresCompletedProjectId,
+    );
+    if (!built) return false;
+  }
   return true;
 }
 

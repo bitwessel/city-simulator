@@ -7,6 +7,7 @@ import {
   lapseEvent,
   simulateDay,
 } from '../simulation/engine';
+import { commissionProject } from '../projects/projects';
 
 // The single source of truth for the UI. All game logic stays in the
 // simulation/generation modules; the store just routes actions to them.
@@ -39,6 +40,11 @@ export interface GameStore {
   /** Wave the memo away entirely — the council handles it offscreen. */
   dismissEvent: () => void;
   chooseEventOption: (choiceId: string) => void;
+  /**
+   * Commission a mayor project in a district. No-op when it isn't allowed
+   * (the pure helper holds all the validation logic).
+   */
+  startProject: (districtId: string, defId: string) => void;
   selectDistrict: (id: string | null) => void;
   selectFaction: (id: string | null) => void;
   dismissOutcome: () => void;
@@ -113,6 +119,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (!city || !activeEvent) return;
     const { city: next } = applyEventChoice(city, activeEvent, choiceId);
     set({ city: next, activeEvent: null, eventOpen: false });
+  },
+
+  startProject: (districtId, defId) => {
+    const { city } = get();
+    if (!city || city.outcome) return;
+    // commissionProject is pure and returns the same city when the order is
+    // invalid, so this set is a harmless no-op in that case.
+    set({ city: commissionProject(city, districtId, defId) });
   },
 
   selectDistrict: (id) =>

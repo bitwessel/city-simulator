@@ -3,6 +3,7 @@ import type { City } from '../types';
 import { MOOD_META, POPULATION_META, STAT_META } from './statMeta';
 import { formatCount, formatSigned, seasonFlavor, statTrend, trendArrow } from './format';
 import { CityVitals } from './CityVitals';
+import { FAVOR_CAP, getFavor } from '../projects/projects';
 
 interface VitalChipProps {
   icon: string;
@@ -31,6 +32,37 @@ function VitalChip({ icon, label, value, delta, deltaGood, accent }: VitalChipPr
       </span>
       <span className={`vital__trend ${deltaClass}`} aria-hidden>
         {trendArrow(delta)}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * City Favor: the slow-recharging resource spent on mayor projects. Shown as a
+ * warm current/cap pill with a tooltip — no countdown, no pressure, just a
+ * gentle "you have some saved up" cue.
+ */
+function FavorChip({ city }: { city: City }) {
+  const favor = Math.floor(getFavor(city));
+  const full = favor >= FAVOR_CAP;
+  return (
+    <div
+      className="vital favor-chip"
+      title={
+        'City Favor — the goodwill you spend to commission projects. ' +
+        'It recharges on its own, a little faster when the city loves you' +
+        (full ? '. The coffers are brimming — go build something!' : '.')
+      }
+    >
+      <span className="vital__icon favor-chip__icon" aria-hidden>
+        ✦
+      </span>
+      <span className="vital__body">
+        <span className="vital__value">
+          {favor}
+          <span className="favor-chip__cap">/{FAVOR_CAP}</span>
+        </span>
+        <span className="vital__label">Favor</span>
       </span>
     </div>
   );
@@ -82,6 +114,7 @@ export function TopBar({ city }: { city: City }) {
           deltaGood={happyDelta > 0}
           accent={STAT_META.happiness.color}
         />
+        <FavorChip city={city} />
       </div>
 
       <div className="topbar__right">
