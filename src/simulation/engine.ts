@@ -21,6 +21,7 @@ import { EVENT_POOL } from '../events/data/events';
 import { HEADLINE_POOL } from './data/headlines';
 import { checkOutcomes } from './outcomes';
 import { deriveCityMood } from './mood';
+import { maybeFoundDistrict } from './expansion';
 
 // ---------------------------------------------------------------------------
 // The simulation engine. `simulateDay` is a pure function: given a city it
@@ -65,6 +66,10 @@ export function simulateDay(
   updateCityStats(city, rng);
   updatePopulation(city, rng);
   updateDistricts(city, rng);
+  // City expansion: a thriving city may break ground on a new district. Uses a
+  // dedicated deterministic sub-stream keyed off seed+day so it never perturbs
+  // the main tick RNG sequence (and thus existing headline/event determinism).
+  maybeFoundDistrict(city, dayRng(city, 'tick:found'), headlines);
   updateFactions(city);
   updateCitizenGroups(city);
   updateRisks(city, rng);
@@ -239,15 +244,23 @@ function updateCityStats(city: City, rng: Rng): void {
 
 function updatePopulation(city: City, rng: Rng): void {
   const s = city.stats;
-  // Daily growth in fractions of a percent, driven by livability.
+  // Daily growth in fractions of a percent, driven by livability. Tuned so a
+  // thriving city multiplies several-fold over a long run while a troubled one
+  // still bleeds people: a comfortable city (happiness ~75, housing ~70, decent
+  // food/wealth) gains ~0.5-0.6%/day → roughly 2.5-3.5x over 200 days.
   let ratePct =
-    (s.happiness - 50) * 0.004 +
-    (s.housing - 50) * 0.002 +
+    (s.happiness - 50) * 0.009 +
+    (s.housing - 50) * 0.005 +
+    (s.food - 45) * 0.004 +
+    (s.wealth - 50) * 0.002 +
     (s.beauty + s.culture - 100) * 0.001;
-  if (s.food < 25) ratePct -= 0.3;
-  if (s.chaos > 75) ratePct -= 0.2;
-  if (s.pollution > 75) ratePct -= 0.15;
+  if (s.food < 25) ratePct -= 0.4;
+  if (s.chaos > 75) ratePct -= 0.3;
+  if (s.pollution > 75) ratePct -= 0.2;
+  if (s.housing < 25) ratePct -= 0.25; // overcrowding drives people out
   ratePct += rng.range(-0.03, 0.03);
+  // Cap daily swings so a single great/terrible day can't explode the count.
+  ratePct = clamp(ratePct, -1.2, 0.9);
 
   const delta = Math.round(city.stats.population * (ratePct / 100));
   city.stats.population = Math.max(0, city.stats.population + delta);

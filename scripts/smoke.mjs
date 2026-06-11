@@ -20,6 +20,14 @@ const modal = () => page.locator('.modal-backdrop');
 const choices = () => page.locator('.modal-backdrop button.choice');
 
 try {
+  // 0. Fail fast (with a useful message) if the dev server isn't up — a plain
+  //    goto would otherwise sit on a 30s navigation timeout.
+  try {
+    await fetch(BASE, { signal: AbortSignal.timeout(3000) });
+  } catch {
+    throw new Error(`No dev server on ${BASE} — run \`npm run dev\` in a separate terminal first`);
+  }
+
   // 1. Start screen
   await page.goto(BASE, { waitUntil: 'networkidle' });
   await page.waitForSelector('text=Mythic Mayor', { timeout: 15000 });
@@ -32,20 +40,33 @@ try {
 
   // 3. Game screen: wait for the day counter and canvas
   await page.waitForSelector('canvas', { timeout: 15000 });
+  // Day counter is in both the topbar and the control bar
   await page.waitForSelector('text=/Day/i', { timeout: 15000 });
   await page.waitForTimeout(2500); // let the 3D scene render a few frames
   await page.screenshot({ path: `${SHOTS}/2-game.png` });
   log('game screen + 3D canvas rendered');
 
-  // 4. Events are rare (~once a minute at Normal speed), so run at Fast and
-  //    wait for the memo *notification* — the game keeps running meanwhile.
-  await page.locator('button[title^="Fast"]').click();
+  // 4. Events are rare (~once a minute at Normal speed), so run at Brisk (fastest)
+  //    and wait for the memo *notification* — the game keeps running meanwhile.
+  //    The redesigned ControlBar uses titles: "Gentle — X days/sec", "Steady — X day/sec",
+  //    "Brisk — X days/sec" for speed indices 1, 2, 3.
+  await page.locator('button[title^="Brisk"]').click();
+  log('speed set to Brisk; waiting for a memo (event pacing is sparse by design: ' +
+    'min ~45 in-game days at 2.5 days/sec ≈ 20-60s real time — not stuck)');
   const toast = () => page.locator('.event-toast');
+  const readDayLoose = async () => {
+    const text = await page.locator('text=/Day\\s*\\d+/i').first().textContent().catch(() => null);
+    return text?.match(/\d+/)?.[0] ?? '?';
+  };
   let eventSeen = false;
   for (let i = 0; i < 200; i++) {
     if ((await toast().count()) > 0) {
       eventSeen = true;
       break;
+    }
+    // Heartbeat every ~10s so the silent stretch never looks like a hang.
+    if (i > 0 && i % 20 === 0) {
+      log(`  ...still waiting (${(i * 0.5).toFixed(0)}s elapsed, in-game day ${await readDayLoose()})`);
     }
     await page.waitForTimeout(500);
   }
@@ -53,8 +74,8 @@ try {
   await page.screenshot({ path: `${SHOTS}/3-event.png` });
   log('event notification appeared');
 
-  // 5. Open the memo from the notification, pick the first choice, and
-  //    confirm both the modal and the notification clear.
+  // 5. Open the memo from the notification (.event-toast__main button), pick the
+  //    first choice, and confirm both the modal and the notification clear.
   await toast().locator('.event-toast__main').click();
   await page.waitForSelector('.modal-backdrop', { timeout: 5000 });
   const title = await page.locator('.memo__title').textContent();
@@ -69,6 +90,7 @@ try {
 
   // 6. Let the simulation run; resolve any events; confirm days advance.
   const readDay = async () => {
+    // Day counter lives in the top bar identity section as "Day N"
     const text = await page.locator('text=/Day\\s*\\d+/i').first().textContent();
     return parseInt(text?.match(/\d+/)?.[0] ?? '0', 10);
   };

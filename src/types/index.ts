@@ -88,7 +88,19 @@ export type BuildingKind =
   | 'greenhouse'
   | 'ruin'
   | 'fountain'
-  | 'tent';
+  | 'tent'
+  // ----- Tall, late-game "skyscraper era" kinds ----------------------------
+  // These are only planned in urban district types and only with high
+  // `appearAt`, so they appear once a district is heavily developed. They
+  // carry a `floors` count the renderer should use to derive height.
+  /** Mid-rise residential block. `floors` ~3-5. Urban districts only. */
+  | 'apartment'
+  /** High-rise tower — the city's tallest profane buildings. `floors` ~6-16. */
+  | 'skyscraper'
+  /** Fantasy high-rise of magic/learning (academy & magical only). `floors` ~6-14. */
+  | 'arcane-spire'
+  /** Tall civic landmark — grand stacked hall. `floors` ~4-9. Urban districts. */
+  | 'grand-hall';
 
 export interface Building {
   id: string;
@@ -105,6 +117,18 @@ export interface Building {
    * its district's development/100 reaches this threshold.
    */
   appearAt: number;
+  /**
+   * Number of storeys for tall building kinds; the renderer derives mesh
+   * height from this (roughly height ∝ floors). Only present on the tall
+   * "skyscraper era" kinds:
+   *   apartment    ~3-5 floors  (mid-rise)
+   *   grand-hall   ~4-9 floors
+   *   arcane-spire ~6-14 floors (magic/learning high-rise)
+   *   skyscraper   ~6-16 floors (the tallest)
+   * Undefined for all classic low kinds (house, tower, temple, ...), which
+   * keep using `scale` alone for their (short) height.
+   */
+  floors?: number;
 }
 
 export type RiskKind =
@@ -155,6 +179,55 @@ export interface District {
 export interface Road {
   from: string; // district id
   to: string; // district id
+}
+
+// ----- Terrain ----------------------------------------------------------------
+
+/**
+ * One low-frequency sine octave of the heightfield:
+ * contributes `amp * sin(x * ax + z * az + phase)` world units.
+ */
+export interface TerrainOctave {
+  ax: number;
+  az: number;
+  phase: number;
+  amp: number;
+}
+
+/** A gentle plateau under a district site so buildings sit level. */
+export interface TerrainFlat {
+  x: number;
+  z: number;
+  /** Fully flat inside this radius; blends back to raw terrain by ~1.8x. */
+  radius: number;
+  /** Plateau height (sampled from the terrain when the site was chosen). */
+  height: number;
+}
+
+/** The river: a densified centerline polyline crossing the whole map. */
+export interface TerrainRiver {
+  points: { x: number; z: number }[];
+  /** Channel width in world units (carve + water surface derive from it). */
+  width: number;
+}
+
+/**
+ * Deterministic terrain description generated alongside the city (its own
+ * seeded sub-stream). Plain data only: the renderer builds meshes from it and
+ * the simulation queries it via `terrainHeightAt` — never store meshes here.
+ */
+export interface TerrainData {
+  /** The terrain spans -size..size on both axes. */
+  size: number;
+  /** Base elevation the octaves modulate around. */
+  baseHeight: number;
+  octaves: TerrainOctave[];
+  river: TerrainRiver;
+  /**
+   * District plateaus, appended in founding order (the initial districts by
+   * the generator, later ones by mid-run expansion).
+   */
+  flats: TerrainFlat[];
 }
 
 // ----- Citizens & factions ---------------------------------------------------
@@ -397,6 +470,23 @@ export interface City {
   outcomeStreaks: Record<string, number>;
   outcome: CityOutcome | null;
   mood: CityMood;
+  /**
+   * Population at the moment the city was founded (day 1). Used by mid-run
+   * city expansion to detect "the city has grown X% since founding". Set by
+   * the generator; optional so older saves still load.
+   */
+  foundingPopulation?: number;
+  /**
+   * The day the most recent mid-run district was broken ground on (0/undefined
+   * if none yet). Mid-run expansion uses this to space foundings apart.
+   */
+  lastDistrictFoundedDay?: number;
+  /**
+   * The generated landscape (heightfield + river + district plateaus). Set by
+   * the generator; optional so older in-memory states still load (the renderer
+   * falls back to flat ground at y=0 when absent).
+   */
+  terrain?: TerrainData;
 }
 
 // ----- Engine results -----------------------------------------------------------------------

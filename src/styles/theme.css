@@ -1,87 +1,144 @@
 /* ===========================================================================
    Mythic Mayor — shared theme tokens & primitives.
-   Warm fantasy: deep night-blue ground, parchment panels, brass/wood accents.
+   Warm storybook meets modern glass: bright translucent panels with soft
+   shadows that stay readable over both sunny and moody 3D scenes. The 3D city
+   is the star; the UI floats lightly above it.
    =========================================================================== */
 
 :root {
-  /* Night & charcoal grounds */
-  --mm-night: #14171f;
-  --mm-night-2: #1c2230;
-  --mm-night-3: #232b3c;
+  /* ---- Warm paper / cream surfaces (the panel bodies) ---- */
+  --mm-cream: #fbf4e6;
+  --mm-cream-2: #f4e9d4;
+  --mm-cream-3: #ead9bd;
+  --mm-parchment: #f7eed9; /* legacy alias kept for letter surfaces */
+  --mm-parchment-2: #efe2c6;
+  --mm-parchment-3: #e2cfa6;
 
-  /* Parchment family */
-  --mm-parchment: #f0e6d0;
-  --mm-parchment-2: #e6d8bb;
-  --mm-parchment-3: #d8c6a0;
-  --mm-parchment-ink: #3a2f1f;
-  --mm-parchment-ink-soft: #5e503a;
+  /* ---- Ink / text on light panels ---- */
+  --mm-ink: #4a3a2a; /* primary text */
+  --mm-ink-soft: #6f5c43; /* secondary */
+  --mm-ink-faint: #9a886e; /* tertiary / captions */
+  --mm-parchment-ink: var(--mm-ink); /* legacy alias */
+  --mm-parchment-ink-soft: var(--mm-ink-soft); /* legacy alias */
 
-  /* Brass / wood accents */
-  --mm-brass: #c9a24b;
-  --mm-brass-bright: #e7c66e;
-  --mm-wood: #6e4f33;
-  --mm-wood-dark: #4a3522;
+  /* ---- Frosted-glass panel: light + translucent so the city glows through,
+     but opaque enough to read over a bright daytime scene. ---- */
+  --mm-glass: rgba(252, 246, 235, 0.78);
+  --mm-glass-strong: rgba(252, 246, 235, 0.9);
+  --mm-glass-hairline: rgba(120, 92, 56, 0.16);
+  --mm-glass-border: rgba(120, 92, 56, 0.16); /* legacy alias */
+  --mm-blur: 16px;
 
-  /* Glass panel over the 3D scene (dark, translucent) */
-  --mm-glass: rgba(26, 22, 16, 0.82);
-  --mm-glass-2: rgba(34, 28, 20, 0.9);
-  --mm-glass-border: rgba(201, 162, 75, 0.35);
+  /* ---- Warm accent family (brass / honey / terracotta) ---- */
+  --mm-brass: #c2913c;
+  --mm-brass-bright: #e0aa4a;
+  --mm-honey: #f0c75e;
+  --mm-terracotta: #cf7a52;
+  --mm-wood: #7a5a3a;
+  --mm-wood-dark: #5a4128;
 
-  /* Text */
-  --mm-text: #efe6d2;
-  --mm-text-dim: #b9ab8e;
-  --mm-text-faint: #8a7d63;
+  /* ---- Semantic tones (calm, slightly desaturated for the soft look) ---- */
+  --mm-good: #5fa771;
+  --mm-good-ink: #2f6b3c;
+  --mm-bad: #d2735c;
+  --mm-bad-ink: #a8432e;
+  --mm-weird: #a877d6;
+  --mm-weird-ink: #6f47a0;
+  --mm-warn: #d9a843;
 
-  /* Semantic tones */
-  --mm-good: #7fb389;
-  --mm-bad: #d97a6c;
-  --mm-weird: #b07fd6;
-  --mm-warn: #e0b341;
+  /* ---- Sky / start-screen grounds (warm dawn rather than dark night) ---- */
+  --mm-dawn-1: #fbe7c6;
+  --mm-dawn-2: #f3c8a0;
+  --mm-dawn-3: #d9a7c4;
+  --mm-dusk: #4a3a5e;
 
-  --mm-radius: 12px;
-  --mm-radius-sm: 8px;
-  --mm-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
-  --mm-shadow-sm: 0 4px 14px rgba(0, 0, 0, 0.35);
+  /* ---- Radii ---- */
+  --mm-radius-xl: 22px;
+  --mm-radius: 16px;
+  --mm-radius-sm: 11px;
+  --mm-radius-xs: 8px;
+  --mm-radius-pill: 999px;
 
-  --mm-serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
-  --mm-body: Georgia, 'Times New Roman', serif;
+  /* ---- Soft shadows (warm-tinted, low contrast) ---- */
+  --mm-shadow: 0 14px 38px rgba(74, 53, 34, 0.22), 0 2px 8px rgba(74, 53, 34, 0.1);
+  --mm-shadow-sm: 0 6px 18px rgba(74, 53, 34, 0.16);
+  --mm-shadow-lift: 0 22px 60px rgba(74, 53, 34, 0.28);
+
+  /* ---- Spacing scale ---- */
+  --mm-sp-1: 4px;
+  --mm-sp-2: 8px;
+  --mm-sp-3: 12px;
+  --mm-sp-4: 16px;
+  --mm-sp-5: 22px;
+  --mm-sp-6: 30px;
+
+  /* ---- Type scale ---- */
+  --mm-fs-xs: 0.72rem;
+  --mm-fs-sm: 0.82rem;
+  --mm-fs-base: 0.92rem;
+  --mm-fs-md: 1.05rem;
+  --mm-fs-lg: 1.3rem;
+  --mm-fs-xl: 1.7rem;
+  --mm-fs-2xl: 2.4rem;
+
+  /* ---- Fonts ---- */
+  --mm-display: 'Fraunces', 'Iowan Old Style', Palatino, Georgia, serif;
+  --mm-serif: var(--mm-display); /* legacy alias */
+  --mm-body: 'Nunito', 'Segoe UI', system-ui, sans-serif;
+
+  --mm-ease: cubic-bezier(0.2, 0.9, 0.3, 1.05);
 }
 
-/* ----- Parchment surface texture (subtle, CSS-only) ----- */
+/* ----- Aged-paper surface (used for letters / chronicle) ----- */
 .mm-parchment-surface {
   background-color: var(--mm-parchment);
   background-image:
-    radial-gradient(circle at 18% 22%, rgba(110, 79, 51, 0.06) 0, transparent 45%),
-    radial-gradient(circle at 82% 78%, rgba(110, 79, 51, 0.07) 0, transparent 50%),
-    linear-gradient(140deg, rgba(255, 255, 255, 0.18), rgba(0, 0, 0, 0.05));
-  color: var(--mm-parchment-ink);
+    radial-gradient(circle at 18% 22%, rgba(120, 92, 56, 0.05) 0, transparent 45%),
+    radial-gradient(circle at 82% 78%, rgba(120, 92, 56, 0.06) 0, transparent 50%),
+    linear-gradient(140deg, rgba(255, 255, 255, 0.5), rgba(120, 92, 56, 0.04));
+  color: var(--mm-ink);
 }
 
-/* ----- Generic panel over the scene ----- */
+/* ----- Floating frosted-glass panel over the scene ----- */
 .mm-panel {
   background: var(--mm-glass);
-  border: 1px solid var(--mm-glass-border);
+  border: 1px solid var(--mm-glass-hairline);
   border-radius: var(--mm-radius);
   box-shadow: var(--mm-shadow);
-  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(var(--mm-blur)) saturate(1.15);
+  backdrop-filter: blur(var(--mm-blur)) saturate(1.15);
+  color: var(--mm-ink);
+}
+/* A soft top highlight makes panels read as glass, not flat cards. */
+.mm-panel--gloss {
+  background-image: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.45),
+    rgba(255, 255, 255, 0) 38%
+  );
 }
 
 /* ----- Buttons ----- */
 .mm-btn {
-  font-family: var(--mm-serif);
+  font-family: var(--mm-body);
+  font-weight: 700;
   cursor: pointer;
   border-radius: var(--mm-radius-sm);
-  border: 1px solid var(--mm-glass-border);
-  background: linear-gradient(180deg, var(--mm-night-3), var(--mm-night-2));
-  color: var(--mm-text);
-  padding: 8px 14px;
-  font-size: 0.95rem;
-  transition: transform 0.08s ease, background 0.15s ease, border-color 0.15s ease,
-    box-shadow 0.15s ease;
+  border: 1px solid var(--mm-glass-hairline);
+  background: rgba(255, 255, 255, 0.55);
+  color: var(--mm-ink);
+  padding: 9px 16px;
+  font-size: var(--mm-fs-base);
+  transition:
+    transform 0.1s var(--mm-ease),
+    background 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
 }
 .mm-btn:hover {
   border-color: var(--mm-brass);
-  box-shadow: 0 0 0 1px rgba(201, 162, 75, 0.25), var(--mm-shadow-sm);
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: var(--mm-shadow-sm);
 }
 .mm-btn:active {
   transform: translateY(1px);
@@ -91,33 +148,37 @@
   cursor: not-allowed;
 }
 .mm-btn--brass {
-  background: linear-gradient(180deg, var(--mm-brass-bright), var(--mm-brass));
-  color: #2a210f;
-  border-color: rgba(0, 0, 0, 0.25);
-  font-weight: 700;
+  background: linear-gradient(180deg, var(--mm-honey), var(--mm-brass));
+  color: #4a3406;
+  border-color: rgba(122, 90, 26, 0.4);
+  font-weight: 800;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 .mm-btn--brass:hover {
-  box-shadow: 0 0 22px rgba(231, 198, 110, 0.45), var(--mm-shadow-sm);
+  background: linear-gradient(180deg, #ffd97a, var(--mm-brass-bright));
+  box-shadow: 0 10px 26px rgba(224, 170, 74, 0.45), var(--mm-shadow-sm);
 }
 .mm-btn--active {
-  border-color: var(--mm-brass-bright);
-  box-shadow: inset 0 0 0 1px var(--mm-brass);
-  color: var(--mm-brass-bright);
+  border-color: var(--mm-brass);
+  background: linear-gradient(180deg, var(--mm-honey), var(--mm-brass));
+  color: #4a3406;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
 
 /* ----- Meters / bars ----- */
 .mm-meter {
   position: relative;
-  height: 7px;
-  border-radius: 6px;
-  background: rgba(0, 0, 0, 0.35);
+  height: 9px;
+  border-radius: var(--mm-radius-pill);
+  background: rgba(120, 92, 56, 0.16);
   overflow: hidden;
 }
 .mm-meter__fill {
   position: absolute;
   inset: 0 auto 0 0;
-  border-radius: 6px;
-  transition: width 0.4s ease;
+  border-radius: var(--mm-radius-pill);
+  transition: width 0.5s var(--mm-ease);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 
 /* ----- Scrollbars ----- */
@@ -132,6 +193,8 @@
 .mm-scroll::-webkit-scrollbar-thumb {
   background: linear-gradient(var(--mm-brass), var(--mm-wood));
   border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 .mm-scroll::-webkit-scrollbar-track {
   background: transparent;
@@ -143,7 +206,7 @@
   to { opacity: 1; }
 }
 @keyframes mm-pop-in {
-  0% { opacity: 0; transform: scale(0.92) translateY(8px); }
+  0% { opacity: 0; transform: scale(0.94) translateY(8px); }
   100% { opacity: 1; transform: scale(1) translateY(0); }
 }
 @keyframes mm-slide-left {
@@ -157,4 +220,18 @@
 @keyframes mm-slide-down {
   from { opacity: 0; transform: translateY(-14px); }
   to { opacity: 1; transform: translateY(0); }
+}
+@keyframes mm-slide-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }

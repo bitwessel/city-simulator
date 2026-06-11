@@ -75,8 +75,15 @@ sequence of choices always replays the exact same city, events, dice and headlin
 
 - **Name + tagline** from component pools (24 prefixes × 16 suffixes, 16 taglines).
 - **Districts**: 5–8 of 12 types (old town always present), laid out on a noisy spiral
-  with minimum spacing, each with buildings (placed by rejection sampling), wealth,
-  mood, local risks, and a visual palette.
+  with minimum spacing, each with a dense building roster (≈18–40, scaled by footprint,
+  placed by rejection sampling), wealth, mood, local risks, and a visual palette. Each
+  building carries an `appearAt` development threshold spread across the full 0..1 range,
+  so districts visibly build up over a run. **Urban district types** (old-town, market,
+  workers, industrial, noble-hill, academy, harbor — and magical, but only as spires)
+  additionally plan **tall buildings** with high `appearAt`: `apartment` mid-rises,
+  `skyscraper`/`grand-hall` high-rises, and `arcane-spire` for academy/magical. These
+  carry a `floors` count the renderer turns into height — the "skyscraper era" that only
+  arrives once a district is heavily developed. Wealthier/larger districts plan more.
 - **Roads**: a minimum spanning tree over district positions plus a few scenic extras,
   so the map is always connected.
 - **Factions**: 4–6 of 12 archetypes, biased toward ones whose home district exists.
@@ -91,9 +98,20 @@ sequence of choices always replays the exact same city, events, dice and headlin
 
 `simulateDay(city)` is a pure function returning a new city one day older. Each tick:
 
-quirk drift → resources → stat spirals → population → district moods → faction
-satisfaction → citizen groups → risk levels → disaster rolls → headlines → maybe
-trigger an event → derive visual mood → check outcomes.
+quirk drift → resources → stat spirals → population → district moods → **city
+expansion** → faction satisfaction → citizen groups → risk levels → disaster rolls →
+headlines → maybe trigger an event → derive visual mood → check outcomes.
+
+A thriving city periodically **breaks ground on a brand-new district** (`src/simulation/
+expansion.ts`): once past day 30, under decent happiness/wealth and either housing
+pressure or ≥25% population growth since founding, with at least ~28 days between
+foundings and a hard cap of 13 districts. New districts prefer not-yet-present types
+(then duplicates with distinct names), are placed adjacent to the layout respecting the
+24-unit spacing, seed a small population transferred from existing districts (the city
+total is unchanged), get their own low-development building roster, are road-connected to
+their nearest neighbour (occasionally a second), and announce themselves with a headline.
+All of it derives from a dedicated `hash(seed + ':tick:found:' + day)` sub-stream, so the
+expansion is fully deterministic.
 
 The spiral rules are the heart of it: happiness drifts toward a target implied by
 food/housing/safety/beauty/culture minus pollution/chaos; chaos decays but feeds on

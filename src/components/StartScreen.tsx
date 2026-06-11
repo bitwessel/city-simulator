@@ -36,7 +36,8 @@ export function StartScreen() {
         />
       ))}
 
-      <main className="start__card">
+      <main className="start__card mm-panel--gloss">
+        <div className="start__crest" aria-hidden>🏰</div>
         <h1 className="start__title">Mythic Mayor</h1>
         <p className="start__subtitle">Every great city begins as a rumor.</p>
         <p className="start__desc">

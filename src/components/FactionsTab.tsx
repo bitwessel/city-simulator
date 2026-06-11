@@ -4,10 +4,10 @@ import { FACTION_META } from './statMeta';
 import { LabeledMeter } from './Meter';
 
 function satisfactionColor(value: number): string {
-  if (value < 25) return '#d97a6c';
-  if (value < 45) return '#e0b341';
-  if (value > 60) return '#7fb389';
-  return '#cdbf9f';
+  if (value < 25) return 'var(--mm-bad)';
+  if (value < 45) return 'var(--mm-warn)';
+  if (value > 60) return 'var(--mm-good)';
+  return 'var(--mm-brass)';
 }
 
 export function FactionsTab({ city }: { city: City }) {
@@ -36,7 +36,7 @@ export function FactionsTab({ city }: { city: City }) {
               </div>
               <p className="faction__agenda">{f.agenda}</p>
               <p className="faction__flavor">“{f.flavor}”</p>
-              <LabeledMeter label="Influence" value={f.influence} color="#b08a5e" />
+              <LabeledMeter label="Influence" value={f.influence} color="var(--mm-wood)" />
               <LabeledMeter
                 label="Satisfaction"
                 value={f.satisfaction}

@@ -40,6 +40,18 @@ export const TOWER_BODY = new CylinderGeometry(0.42, 0.5, 1, 12);
 // Thin ring for selection halos.
 export const SELECT_RING = new TorusGeometry(1, 0.045, 8, 48);
 
+// A chunkier torus for arcane-spire floating rings / decorative haloes.
+export const UNIT_TORUS = new TorusGeometry(0.5, 0.07, 8, 24);
+
+// ----- Scenery primitives ----------------------------------------------------
+// The instanced scenery layer draws thousands of trees/bushes/rocks twice
+// (main + shadow pass), so its primitives are as cheap as silhouettes allow:
+// a 6x4 sphere (~36 tris vs 160 for LOWPOLY_SPHERE), an open-ended 8-seg cone
+// and an open-ended 5-seg trunk (their hidden caps never read at game angles).
+export const SCENERY_BLOB = new SphereGeometry(0.5, 6, 4);
+export const SCENERY_CONE = new ConeGeometry(0.5, 1, 8, 1, true);
+export const SCENERY_TRUNK = new CylinderGeometry(0.5, 0.5, 1, 5, 1, true);
+
 /** Geometry registry keyed by name, in case a consumer wants lookups. */
 export const SHARED_GEOMETRY: Record<string, BufferGeometry> = {
   box: UNIT_BOX,
@@ -52,4 +64,5 @@ export const SHARED_GEOMETRY: Record<string, BufferGeometry> = {
   disc: UNIT_DISC,
   tower: TOWER_BODY,
   ring: SELECT_RING,
+  torus: UNIT_TORUS,
 };

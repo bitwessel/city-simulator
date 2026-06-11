@@ -50,6 +50,20 @@ export interface DistrictArchetype {
   statTilt: Partial<Record<BoundedStatKey, number>>;
   wealthRange: [number, number];
   citizenArchetypes: string[];
+  /**
+   * Whether this is an "urban" district that enters a skyscraper era once
+   * highly developed. Urban districts plan tall buildings (apartments,
+   * skyscrapers, grand halls, arcane spires) at high `appearAt`; non-urban
+   * types (garden, forest-edge, ruins, festival, plain magical) stay low.
+   * Optional: absent means non-urban.
+   */
+  urban?: boolean;
+  /**
+   * Tall building kinds this district may grow in its skyscraper era, listed
+   * in roughly ascending height. Only consulted when `urban` is true (or for
+   * arcane-spire in academy/magical). Empty/absent ⇒ no tall buildings.
+   */
+  tallKinds?: BuildingKind[];
 }
 
 export const DISTRICT_ARCHETYPES: DistrictArchetype[] = [
@@ -61,6 +75,8 @@ export const DISTRICT_ARCHETYPES: DistrictArchetype[] = [
     statTilt: { culture: 4, beauty: 2, infrastructure: -2 },
     wealthRange: [35, 60],
     citizenArchetypes: ['longtime locals', 'retired adventurers', 'nosy historians'],
+    urban: true,
+    tallKinds: ['apartment', 'grand-hall', 'skyscraper'],
   },
   {
     type: 'market',
@@ -70,6 +86,8 @@ export const DISTRICT_ARCHETYPES: DistrictArchetype[] = [
     statTilt: { wealth: 5, chaos: 2 },
     wealthRange: [45, 75],
     citizenArchetypes: ['stall keepers', 'traveling traders', 'professional hagglers'],
+    urban: true,
+    tallKinds: ['apartment', 'grand-hall', 'skyscraper'],
   },
   {
     type: 'harbor',
@@ -79,6 +97,8 @@ export const DISTRICT_ARCHETYPES: DistrictArchetype[] = [
     statTilt: { wealth: 3, food: 4, pollution: 2 },
     wealthRange: [30, 55],
     citizenArchetypes: ['fisherfolk', 'dockhands', 'superstitious sailors'],
+    urban: true,
+    tallKinds: ['apartment', 'skyscraper'],
   },
   {
     type: 'forest-edge',
@@ -97,6 +117,8 @@ export const DISTRICT_ARCHETYPES: DistrictArchetype[] = [
     statTilt: { culture: 5, magic: 3, wealth: 2 },
     wealthRange: [40, 70],
     citizenArchetypes: ['students', 'absent-minded professors', 'competitive librarians'],
+    urban: true,
+    tallKinds: ['apartment', 'grand-hall', 'arcane-spire'],
   },
   {
     type: 'industrial',
@@ -106,6 +128,8 @@ export const DISTRICT_ARCHETYPES: DistrictArchetype[] = [
     statTilt: { wealth: 4, infrastructure: 4, pollution: 6, beauty: -3 },
     wealthRange: [30, 55],
     citizenArchetypes: ['machinists', 'soot-covered apprentices', 'proud foremen'],
+    urban: true,
+    tallKinds: ['apartment', 'skyscraper'],
   },
   {
     type: 'noble-hill',
@@ -115,6 +139,8 @@ export const DISTRICT_ARCHETYPES: DistrictArchetype[] = [
     statTilt: { wealth: 6, beauty: 3, trust: -2 },
     wealthRange: [65, 95],
     citizenArchetypes: ['minor nobles', 'ambitious socialites', 'extremely formal butlers'],
+    urban: true,
+    tallKinds: ['apartment', 'grand-hall', 'skyscraper'],
   },
   {
     type: 'workers',
@@ -124,6 +150,8 @@ export const DISTRICT_ARCHETYPES: DistrictArchetype[] = [
     statTilt: { infrastructure: 3, housing: 4, culture: -1 },
     wealthRange: [20, 40],
     citizenArchetypes: ['builders', 'union regulars', 'tired but cheerful parents'],
+    urban: true,
+    tallKinds: ['apartment', 'skyscraper'],
   },
   {
     type: 'garden',
@@ -160,6 +188,10 @@ export const DISTRICT_ARCHETYPES: DistrictArchetype[] = [
     statTilt: { magic: 8, chaos: 3, culture: 2, safety: -2 },
     wealthRange: [40, 70],
     citizenArchetypes: ['hedge wizards', 'enchanted-object owners', 'apprentice mages'],
+    // Magical districts only grow upward as arcane spires — no profane
+    // skyscrapers or apartment blocks among the floating staircases.
+    urban: true,
+    tallKinds: ['arcane-spire'],
   },
 ];
 

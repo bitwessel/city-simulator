@@ -5,9 +5,9 @@ import { LabeledMeter, Meter } from './Meter';
 import { formatCount } from './format';
 
 function moodColor(mood: number): string {
-  if (mood >= 60) return '#7fb389';
-  if (mood >= 40) return '#e0b341';
-  return '#d97a6c';
+  if (mood >= 60) return 'var(--mm-good)';
+  if (mood >= 40) return 'var(--mm-warn)';
+  return 'var(--mm-bad)';
 }
 
 function DistrictDetail({ city, district }: { city: City; district: District }) {
@@ -46,9 +46,9 @@ function DistrictDetail({ city, district }: { city: City; district: District }) 
         </div>
       </div>
 
-      <LabeledMeter label="Wealth" value={district.wealth} color="#e0b341" />
+      <LabeledMeter label="Wealth" value={district.wealth} color="var(--mm-honey)" />
       <LabeledMeter label="Mood" value={district.mood} color={moodColor(district.mood)} />
-      <LabeledMeter label="Built up" value={district.development} color="#c9a24b" />
+      <LabeledMeter label="Built up" value={district.development} color="var(--mm-brass)" />
 
       {district.quirks.length > 0 && (
         <p className="card__desc" style={{ margin: '8px 0' }}>
@@ -72,7 +72,10 @@ function DistrictDetail({ city, district }: { city: City; district: District }) 
                 </span>
                 <span>{Math.round(level ?? 0)}</span>
               </div>
-              <Meter value={level ?? 0} color={(level ?? 0) >= 60 ? '#d97a6c' : '#e0b341'} />
+              <Meter
+                value={level ?? 0}
+                color={(level ?? 0) >= 60 ? 'var(--mm-bad)' : 'var(--mm-warn)'}
+              />
             </div>
           );
         })

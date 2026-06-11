@@ -13,7 +13,14 @@ body,
 }
 
 body {
-  font-family: Georgia, 'Times New Roman', serif;
-  background: #1a1d24;
-  color: #e8e2d4;
+  font-family: 'Nunito', 'Segoe UI', system-ui, sans-serif;
+  /* Warm fallback behind the 3D canvas / before fonts load. */
+  background: #f3e6cf;
+  color: #4a3a2a;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button {
+  font-family: inherit;
 }

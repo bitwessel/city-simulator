@@ -2,7 +2,47 @@ import { describe, expect, it } from 'vitest';
 import type { ActiveEvent, City } from '../src/types';
 import { applyEventChoice, lapseEvent, simulateDay } from '../src/simulation/engine';
 import { OUTCOME_DEFS } from '../src/simulation/outcomes';
+import { MAX_DISTRICTS } from '../src/simulation/expansion';
 import { autoplay, expectStatsValid, freshCity } from './helpers';
+import { distance } from '../src/utils/math';
+
+/**
+ * Drive a city for `days` days under conditions favourable to expansion
+ * (thriving but kept below ending thresholds, with housing pressure), pinning
+ * stats each tick before simulating. Events are suppressed for stability.
+ * Returns the final city. Deterministic for a given seed.
+ */
+function growWithPressure(seed: string, days: number): City {
+  let city = freshCity(seed);
+  for (let i = 0; i < days; i++) {
+    if (city.outcome) break;
+    city.stats.happiness = 66;
+    city.stats.wealth = 68;
+    city.stats.infrastructure = 62;
+    city.stats.food = 62;
+    city.stats.chaos = 24;
+    city.stats.housing = 42; // overcrowded → triggers founding
+    city = simulateDay(city, { suppressEvents: true }).city;
+  }
+  return city;
+}
+
+function isConnected(city: City): boolean {
+  const adjacency = new Map<string, string[]>();
+  for (const road of city.roads) {
+    adjacency.set(road.from, [...(adjacency.get(road.from) ?? []), road.to]);
+    adjacency.set(road.to, [...(adjacency.get(road.to) ?? []), road.from]);
+  }
+  const visited = new Set<string>();
+  const queue = [city.districts[0].id];
+  while (queue.length > 0) {
+    const id = queue.pop()!;
+    if (visited.has(id)) continue;
+    visited.add(id);
+    queue.push(...(adjacency.get(id) ?? []));
+  }
+  return visited.size === city.districts.length;
+}
 
 describe('simulation engine', () => {
   it('advances the day and keeps stats valid', () => {
@@ -284,5 +324,138 @@ describe('simulation engine', () => {
     }
     expect(current.stats.beauty).toBeLessThan(start.beauty);
     expect(current.stats.happiness).toBeLessThan(start.happiness);
+  });
+});
+
+describe('city expansion: founding new districts mid-run', () => {
+  it('a thriving, pressured city founds new districts over time', () => {
+    const city = growWithPressure('expand-test', 250);
+    const start = freshCity('expand-test').districts.length;
+    // It should have grown (unless it hit an ending first), but never shrink.
+    expect(city.districts.length).toBeGreaterThanOrEqual(start);
+    if (!city.outcome) {
+      expect(city.districts.length).toBeGreaterThan(start);
+    }
+  });
+
+  it('district founding is deterministic for the same seed and choices', () => {
+    const a = growWithPressure('expand-determinism', 220);
+    const b = growWithPressure('expand-determinism', 220);
+    expect(a.districts.length).toBe(b.districts.length);
+    expect(a.districts.map((d) => `${d.type}:${d.name}`)).toEqual(
+      b.districts.map((d) => `${d.type}:${d.name}`),
+    );
+    expect(a.districts.map((d) => d.position)).toEqual(
+      b.districts.map((d) => d.position),
+    );
+    expect(a.roads).toEqual(b.roads);
+    expect(a.lastDistrictFoundedDay).toBe(b.lastDistrictFoundedDay);
+  });
+
+  it('never exceeds the hard district cap', () => {
+    for (const seed of ['cap-1', 'cap-2', 'cap-3']) {
+      const city = growWithPressure(seed, 400);
+      expect(city.districts.length).toBeLessThanOrEqual(MAX_DISTRICTS);
+    }
+  });
+
+  it('founded districts respect spacing and keep the road graph connected', () => {
+    for (const seed of ['inv-1', 'inv-2', 'inv-3', 'inv-4']) {
+      const city = growWithPressure(seed, 300);
+      // Min 24-unit centre-to-centre spacing holds across all districts.
+      for (let i = 0; i < city.districts.length; i++) {
+        for (let j = i + 1; j < city.districts.length; j++) {
+          const gap = distance(
+            city.districts[i].position,
+            city.districts[j].position,
+          );
+          expect(gap).toBeGreaterThanOrEqual(24 - 1e-6);
+        }
+      }
+      // Every district is still reachable by road.
+      expect(isConnected(city), seed).toBe(true);
+      // Every road references a real district.
+      const ids = new Set(city.districts.map((d) => d.id));
+      for (const road of city.roads) {
+        expect(ids.has(road.from)).toBe(true);
+        expect(ids.has(road.to)).toBe(true);
+      }
+    }
+  });
+
+  it('founded districts start undeveloped with their own building roster', () => {
+    const city = growWithPressure('young-districts', 250);
+    const start = freshCity('young-districts').districts.length;
+    const founded = city.districts.slice(start);
+    for (const d of founded) {
+      expect(d.buildings.length).toBeGreaterThan(0);
+      // Founding cluster exists.
+      expect(d.buildings.some((b) => b.appearAt === 0)).toBe(true);
+      // Buildings sit inside the footprint.
+      for (const b of d.buildings) {
+        expect(distance(b.position, d.position)).toBeLessThanOrEqual(d.radius + 0.01);
+      }
+    }
+  });
+
+  it('transferring population keeps the district-population sum stable', () => {
+    // A founded district draws people from existing ones, so the sum of
+    // district populations is not inflated by the founding itself.
+    let city = freshCity('pop-transfer');
+    let prevSum = city.districts.reduce((s, d) => s + d.population, 0);
+    let prevCount = city.districts.length;
+    for (let i = 0; i < 200; i++) {
+      if (city.outcome) break;
+      city.stats.happiness = 66;
+      city.stats.wealth = 68;
+      city.stats.housing = 42;
+      city.stats.food = 62;
+      city.stats.chaos = 24;
+      const before = city.districts.reduce((s, d) => s + d.population, 0);
+      city = simulateDay(city, { suppressEvents: true }).city;
+      const after = city.districts.reduce((s, d) => s + d.population, 0);
+      if (city.districts.length > prevCount) {
+        // On a founding tick, the district-pop sum changes only by the day's
+        // normal growth, not by a sudden injection of the seed population.
+        expect(Math.abs(after - before)).toBeLessThan(before * 0.05 + 50);
+        prevCount = city.districts.length;
+      }
+      prevSum = after;
+    }
+    expect(prevSum).toBeGreaterThan(0);
+  });
+
+  it('keeps district and building ids globally unique even with duplicates', () => {
+    // This seed founds enough districts to exhaust the fresh archetypes and
+    // reuse a type, so the duplicate-name/id path is genuinely exercised.
+    const city = growWithPressure('dupseek-14', 400);
+    const types = city.districts.map((d) => d.type);
+    const hasDuplicateType = types.some((t, i) => types.indexOf(t) !== i);
+    expect(hasDuplicateType, 'expected a duplicate district type at the cap').toBe(true);
+
+    const districtIds = city.districts.map((d) => d.id);
+    expect(new Set(districtIds).size).toBe(districtIds.length);
+    // Duplicate-type districts still get distinct display names.
+    const names = city.districts.map((d) => d.name);
+    expect(new Set(names).size).toBe(names.length);
+    // Building ids are globally unique across the whole city.
+    const buildingIds = city.districts.flatMap((d) => d.buildings.map((b) => b.id));
+    expect(new Set(buildingIds).size).toBe(buildingIds.length);
+  });
+
+  it('long pressured runs keep every stat valid', () => {
+    for (const seed of ['long-1', 'long-2', 'long-3']) {
+      let city = freshCity(seed);
+      for (let i = 0; i < 300; i++) {
+        if (city.outcome) break;
+        city.stats.happiness = 64;
+        city.stats.wealth = 66;
+        city.stats.housing = 44;
+        city.stats.food = 60;
+        city = simulateDay(city, { suppressEvents: true }).city;
+        expectStatsValid(city);
+        expect(city.districts.length).toBeLessThanOrEqual(MAX_DISTRICTS);
+      }
+    }
   });
 });

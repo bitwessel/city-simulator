@@ -10,27 +10,28 @@
   justify-content: center;
   overflow-y: auto;
   padding: 32px 20px;
+  /* Warm dusk so the parchment chronicle glows. */
   background:
-    radial-gradient(ellipse at 50% -10%, rgba(201, 162, 75, 0.12) 0, transparent 55%),
-    linear-gradient(180deg, #0c0e18 0%, #161a2a 60%, #1d1726 100%);
+    radial-gradient(ellipse at 50% -8%, rgba(240, 199, 94, 0.28) 0, transparent 56%),
+    linear-gradient(180deg, #f3d6b0 0%, #e3b6a4 55%, #c79bb8 100%);
 }
 
 .chronicle__scroll {
   position: relative;
   width: min(720px, 94vw);
   margin: auto;
-  padding: 44px 48px 40px;
-  border-radius: 10px;
+  padding: 46px 50px 40px;
+  border-radius: var(--mm-radius);
   border: 1px solid var(--mm-parchment-3);
-  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.65);
-  animation: mm-pop-in 0.55s cubic-bezier(0.2, 0.9, 0.3, 1.1);
+  box-shadow: var(--mm-shadow-lift);
+  animation: mm-pop-in 0.55s var(--mm-ease);
 }
 .chronicle__scroll::before {
   content: '';
   position: absolute;
-  inset: 8px;
-  border: 1px solid rgba(110, 79, 51, 0.22);
-  border-radius: 6px;
+  inset: 9px;
+  border: 1px solid rgba(120, 92, 56, 0.2);
+  border-radius: var(--mm-radius-sm);
   pointer-events: none;
 }
 

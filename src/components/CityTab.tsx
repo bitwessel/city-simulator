@@ -5,15 +5,21 @@ import { Meter } from './Meter';
 import { formatCount } from './format';
 
 function riskColor(level: number): string {
-  if (level >= 60) return '#d97a6c';
-  if (level >= 35) return '#e0b341';
-  return '#7fb389';
+  if (level >= 60) return 'var(--mm-bad)';
+  if (level >= 35) return 'var(--mm-warn)';
+  return 'var(--mm-good)';
 }
 
-function resourceTrend(trend: number): { arrow: string; color: string } {
-  if (trend > 0.05) return { arrow: `▲ +${trend}`, color: '#7fb389' };
-  if (trend < -0.05) return { arrow: `▼ ${trend}`, color: '#d97a6c' };
-  return { arrow: '– steady', color: '#8a7d63' };
+function riskWord(level: number): string {
+  if (level >= 60) return 'Looming';
+  if (level >= 35) return 'Stirring';
+  return 'Faint';
+}
+
+function resourceTrend(trend: number): { label: string; color: string } {
+  if (trend > 0.05) return { label: `▲ +${trend} / day`, color: 'var(--mm-good-ink)' };
+  if (trend < -0.05) return { label: `▼ ${trend} / day`, color: 'var(--mm-bad-ink)' };
+  return { label: '– steady', color: 'var(--mm-ink-faint)' };
 }
 
 export function CityTab({ city }: { city: City }) {
@@ -63,7 +69,7 @@ export function CityTab({ city }: { city: City }) {
                   <span className="resource-row__name">{r.name}</span>
                   <span className="resource-row__amt">{formatCount(r.amount)}</span>
                   <span className="resource-row__trend" style={{ color: t.color }}>
-                    {t.arrow}
+                    {t.label}
                   </span>
                 </div>
               );
@@ -85,7 +91,9 @@ export function CityTab({ city }: { city: City }) {
                   <span className="risk__name">
                     {meta.icon} {meta.label}
                   </span>
-                  <span className="risk__level">{Math.round(risk.level)}/100</span>
+                  <span className="risk__level" title={`${Math.round(risk.level)} / 100`}>
+                    {riskWord(risk.level)}
+                  </span>
                 </div>
                 <Meter value={risk.level} color={riskColor(risk.level)} />
                 <p className="card__desc" style={{ marginTop: 6 }}>

@@ -45,3 +45,22 @@ export function trendArrow(delta: number): string {
   if (delta < 0) return '▼';
   return '–';
 }
+
+// A gentle, purely-cosmetic "season" cycle so the HUD has warm flavor next to
+// the day counter. The simulation has no calendar, so we derive one from the
+// day number (a season every ~12 days, looping through the year).
+const SEASONS = [
+  { label: 'Early Spring', icon: '🌱' },
+  { label: 'High Spring', icon: '🌸' },
+  { label: 'Early Summer', icon: '☀️' },
+  { label: 'High Summer', icon: '🌻' },
+  { label: 'Harvest', icon: '🍂' },
+  { label: 'Late Autumn', icon: '🍁' },
+  { label: 'First Frost', icon: '❄️' },
+  { label: 'Deep Winter', icon: '⛄' },
+] as const;
+
+export function seasonFlavor(day: number): { label: string; icon: string } {
+  const idx = Math.floor((Math.max(1, day) - 1) / 12) % SEASONS.length;
+  return SEASONS[idx];
+}

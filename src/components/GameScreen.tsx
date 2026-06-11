@@ -29,14 +29,16 @@ export function GameScreen({ city }: { city: City }) {
         />
       </div>
 
-      {/* Overlay grid — click-through except on its interactive children. */}
+      {/* Overlay grid — click-through except on its interactive children.
+          The center column stays empty so the 3D map is draggable. */}
       <div className="game__overlay">
         <TopBar city={city} />
         <LeftPanel city={city} />
-        <div className="game__spacer" />
-        <NewsFeed city={city} />
         <ControlBar />
       </div>
+
+      {/* News surfaces as a self-positioning fading ticker + chronicle drawer. */}
+      <NewsFeed city={city} />
 
       {/* A waiting memo shows as an optional notification; the modal only
           opens when the player clicks it. */}

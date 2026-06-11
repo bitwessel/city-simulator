@@ -17,8 +17,6 @@ import { distance } from '../utils/math';
 // re-renders (the city object is replaced every simulated day).
 // ---------------------------------------------------------------------------
 
-const PLATFORM_TOP = 1.0; // platform surface height (see DistrictPlatform)
-
 interface DecorationsProps {
   district: District;
   beauty: number;
@@ -26,6 +24,8 @@ interface DecorationsProps {
   leaf: string;
   trunk: string;
   flower: string;
+  /** Ground height query (terrain) so greenery sits on the land. */
+  groundAt: (x: number, z: number) => number;
 }
 
 interface Placed {
@@ -49,7 +49,7 @@ function tooCloseToBuilding(
   return false;
 }
 
-export function Decorations({ district, beauty, leaf, trunk, flower }: DecorationsProps) {
+export function Decorations({ district, beauty, leaf, trunk, flower, groundAt }: DecorationsProps) {
   const placed = useMemo<Placed[]>(() => {
     if (beauty <= 60) return [];
     // 0 at beauty=60, ramping up to ~16 decorations near beauty=100.
@@ -87,7 +87,7 @@ export function Decorations({ district, beauty, leaf, trunk, flower }: Decoratio
     <group>
       {placed.map((d, i) =>
         d.kind === 'tree' ? (
-          <group key={i} position={[d.x, PLATFORM_TOP, d.z]} rotation={[0, d.rot, 0]} scale={d.s}>
+          <group key={i} position={[d.x, groundAt(d.x, d.z) - 0.05, d.z]} rotation={[0, d.rot, 0]} scale={d.s}>
             {/* trunk */}
             <mesh geometry={UNIT_CYLINDER} position={[0, 0.3, 0]} scale={[0.12, 0.6, 0.12]}>
               <meshStandardMaterial color={trunk} roughness={0.9} />
@@ -101,7 +101,7 @@ export function Decorations({ district, beauty, leaf, trunk, flower }: Decoratio
             </mesh>
           </group>
         ) : (
-          <group key={i} position={[d.x, PLATFORM_TOP, d.z]} scale={d.s}>
+          <group key={i} position={[d.x, groundAt(d.x, d.z) - 0.02, d.z]} scale={d.s}>
             {/* stem */}
             <mesh geometry={UNIT_CYLINDER} position={[0, 0.15, 0]} scale={[0.04, 0.3, 0.04]}>
               <meshStandardMaterial color={'#4f8a3d'} roughness={0.9} />

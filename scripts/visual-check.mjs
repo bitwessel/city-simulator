@@ -6,6 +6,15 @@ import { mkdirSync } from 'node:fs';
 const SHOTS = 'scripts/shots';
 mkdirSync(SHOTS, { recursive: true });
 
+// Fail fast (with a useful message) if the dev server isn't up — a plain
+// goto would otherwise sit on a 30s navigation timeout per seed.
+try {
+  await fetch('http://localhost:5173', { signal: AbortSignal.timeout(3000) });
+} catch {
+  console.error('[visual] FAIL: no dev server on http://localhost:5173 — run `npm run dev` in a separate terminal first');
+  process.exit(1);
+}
+
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
 
@@ -13,6 +22,7 @@ const seeds = process.argv.slice(2);
 const list = seeds.length > 0 ? seeds : ['smoke-test-city', 'emberwick', 'dragon-99'];
 
 for (const seed of list) {
+  console.log(`[visual] capturing ${seed} (~6-9s)...`);
   await page.goto('http://localhost:5173', { waitUntil: 'networkidle' });
   await page.locator('input').first().fill(seed);
   await page.locator('button', { hasText: /create new city/i }).click();

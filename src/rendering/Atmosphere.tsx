@@ -4,9 +4,17 @@ import type {
   DirectionalLight,
   Group,
   Mesh,
+  Object3D,
   Points,
+  Sprite,
 } from 'three';
-import { BufferGeometry, Float32BufferAttribute } from 'three';
+import {
+  BufferGeometry,
+  CanvasTexture,
+  Float32BufferAttribute,
+  Object3D as Obj3D,
+  type InstancedMesh,
+} from 'three';
 import { LOWPOLY_SPHERE } from './shared';
 import { hashFloat } from './hash';
 import type { MoodTheme } from './palette';
@@ -16,14 +24,15 @@ import type { CityMood, CityStats } from '../types';
 // Atmosphere — the state-driven showpiece.
 //
 //   * Lighting & fog come from the mood theme (set in CityScene; the arcane
-//     pulse lives here on the directional light ref).
-//   * Smog puffs: drifting translucent gray spheres when pollution > 55,
-//     count + opacity scaling with pollution.
-//   * Magic sparkles: glowing points drifting upward when magic > 55, more &
-//     brighter as magic rises.
+//     pulse lives here on the directional light ref). Soft shadows + a high
+//     ambient floor keep every mood luminous.
+//   * Drifting low-poly clouds + a handful of instanced circling birds + a soft
+//     sun-glow sprite add charm and depth.
+//   * Smog puffs (pollution > 55) and magic sparkles (magic > 55) react to
+//     stats.
 //
 // All animations are cheap per-frame transforms; geometry/particles are
-// allocated once and reused.
+// allocated once and reused. No per-frame allocation in the hot loops.
 // ---------------------------------------------------------------------------
 
 interface AtmosphereProps {
@@ -48,7 +57,7 @@ function Smog({ pollution, extent }: SmogProps) {
 
   // Count ramps from 0 (at 55) to ~14 (at 100).
   const count = Math.min(14, Math.round((pollution - 55) / 3.2));
-  const opacity = Math.min(0.5, 0.18 + (pollution - 55) / 200);
+  const opacity = Math.min(0.42, 0.14 + (pollution - 55) / 240);
 
   const puffs = useMemo(() => {
     const arr: { x: number; y: number; z: number; s: number; speed: number; phase: number }[] = [];
@@ -56,7 +65,7 @@ function Smog({ pollution, extent }: SmogProps) {
       const k = `smog-${i}`;
       arr.push({
         x: (hashFloat(k, 1) - 0.5) * extent * 1.6,
-        y: 6 + hashFloat(k, 2) * 10,
+        y: 7 + hashFloat(k, 2) * 11,
         z: (hashFloat(k, 3) - 0.5) * extent * 1.6,
         s: 5 + hashFloat(k, 4) * 7,
         speed: 0.4 + hashFloat(k, 5) * 0.5,
@@ -74,7 +83,6 @@ function Smog({ pollution, extent }: SmogProps) {
       const child = g.children[i] as Mesh;
       const p = puffs[i];
       if (!p) continue;
-      // Drift slowly and wrap around the city extent.
       const span = extent * 1.6;
       let x = p.x + ((t * p.speed) % span);
       if (x > span / 2) x -= span;
@@ -90,7 +98,7 @@ function Smog({ pollution, extent }: SmogProps) {
       {puffs.map((p, i) => (
         <mesh key={i} geometry={LOWPOLY_SPHERE} position={[p.x, p.y, p.z]} scale={p.s}>
           <meshStandardMaterial
-            color={'#6b6b5e'}
+            color={'#8a8a76'}
             transparent
             opacity={opacity}
             depthWrite={false}
@@ -100,6 +108,196 @@ function Smog({ pollution, extent }: SmogProps) {
         </mesh>
       ))}
     </group>
+  );
+}
+
+// ----- Clouds --------------------------------------------------------------
+// A few soft low-poly cloud clusters drifting overhead. Each cloud is a small
+// group of squashed spheres; only a handful of meshes total.
+
+function Clouds({ theme, extent }: { theme: MoodTheme; extent: number }) {
+  const groupRef = useRef<Group>(null);
+  const span = Math.max(220, extent * 3);
+
+  const clouds = useMemo(() => {
+    const out: { x: number; y: number; z: number; s: number; speed: number; puffs: { dx: number; dy: number; dz: number; ps: number }[] }[] = [];
+    const n = 8;
+    for (let i = 0; i < n; i++) {
+      const k = `cloud-${i}`;
+      const puffN = 3 + Math.floor(hashFloat(k, 9) * 3);
+      const puffs: { dx: number; dy: number; dz: number; ps: number }[] = [];
+      for (let j = 0; j < puffN; j++) {
+        puffs.push({
+          dx: (hashFloat(k, 20 + j * 3) - 0.5) * 2.4,
+          dy: (hashFloat(k, 21 + j * 3) - 0.5) * 0.5,
+          dz: (hashFloat(k, 22 + j * 3) - 0.5) * 1.4,
+          ps: 0.7 + hashFloat(k, 23 + j * 3) * 0.7,
+        });
+      }
+      // Keep clouds high and ringed out toward the horizon so they never sit
+      // as giant blobs over the city center.
+      const a = (i / n) * Math.PI * 2 + hashFloat(k, 7) * 0.6;
+      const ringR = span * (0.42 + hashFloat(k, 8) * 0.22);
+      out.push({
+        x: Math.cos(a) * ringR,
+        y: 64 + hashFloat(k, 2) * 26,
+        z: Math.sin(a) * ringR,
+        s: 4 + hashFloat(k, 4) * 4,
+        speed: 0.4 + hashFloat(k, 5) * 0.6,
+        puffs,
+      });
+    }
+    return out;
+  }, [span]);
+
+  useFrame((state) => {
+    const g = groupRef.current;
+    if (!g) return;
+    const t = state.clock.elapsedTime;
+    for (let i = 0; i < g.children.length; i++) {
+      const child = g.children[i];
+      const c = clouds[i];
+      if (!c) continue;
+      // Gentle local drift around the cloud's resting spot (stays near the
+      // horizon ring, never marches across the whole sky).
+      child.position.x = c.x + Math.sin(t * c.speed * 0.25 + i) * 14;
+      child.position.z = c.z + Math.cos(t * c.speed * 0.2 + i) * 10;
+    }
+  });
+
+  return (
+    <group ref={groupRef}>
+      {clouds.map((c, i) => (
+        <group key={i} position={[c.x, c.y, c.z]} scale={c.s}>
+          {c.puffs.map((p, j) => (
+            <mesh key={j} geometry={LOWPOLY_SPHERE} position={[p.dx, p.dy, p.dz]} scale={[p.ps * 1.4, p.ps, p.ps * 1.2]}>
+              <meshStandardMaterial
+                color={'#ffffff'}
+                emissive={theme.fog}
+                emissiveIntensity={0.25}
+                transparent
+                opacity={0.85}
+                depthWrite={false}
+                roughness={1}
+                metalness={0}
+                fog={false}
+              />
+            </mesh>
+          ))}
+        </group>
+      ))}
+    </group>
+  );
+}
+
+// ----- Birds ---------------------------------------------------------------
+// A handful of instanced V-shaped birds circling slowly above the city.
+
+const BIRD_COUNT = 10;
+
+function Birds({ extent }: { extent: number }) {
+  const meshRef = useRef<InstancedMesh>(null);
+  const dummy = useMemo<Object3D>(() => new Obj3D(), []);
+  const meta = useMemo(() => {
+    const arr: { r: number; y: number; speed: number; phase: number; flap: number }[] = [];
+    for (let i = 0; i < BIRD_COUNT; i++) {
+      const k = `bird-${i}`;
+      arr.push({
+        r: extent * (0.5 + hashFloat(k, 1) * 0.7),
+        y: 26 + hashFloat(k, 2) * 18,
+        speed: 0.12 + hashFloat(k, 3) * 0.16,
+        phase: hashFloat(k, 4) * Math.PI * 2,
+        flap: 4 + hashFloat(k, 5) * 4,
+      });
+    }
+    return arr;
+  }, [extent]);
+
+  useFrame((state) => {
+    const mesh = meshRef.current;
+    if (!mesh) return;
+    const t = state.clock.elapsedTime;
+    for (let i = 0; i < BIRD_COUNT; i++) {
+      const m = meta[i];
+      const a = m.phase + t * m.speed;
+      const x = Math.cos(a) * m.r;
+      const z = Math.sin(a) * m.r;
+      const y = m.y + Math.sin(t * 0.4 + m.phase) * 1.5;
+      dummy.position.set(x, y, z);
+      // Face direction of travel; gentle flap via Z scale.
+      dummy.rotation.set(0, -a + Math.PI / 2, Math.sin(t * m.flap + m.phase) * 0.4);
+      const flap = 0.8 + Math.abs(Math.sin(t * m.flap + m.phase)) * 0.5;
+      dummy.scale.set(1, 1, flap);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(i, dummy.matrix);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+  });
+
+  return (
+    <instancedMesh ref={meshRef} args={[undefined, undefined, BIRD_COUNT]} frustumCulled={false}>
+      {/* a flat, wide shallow cone reads as a little V-bird at distance */}
+      <coneGeometry args={[0.6, 0.12, 4]} />
+      <meshStandardMaterial color={'#4a4a55'} roughness={1} metalness={0} fog />
+    </instancedMesh>
+  );
+}
+
+// ----- Sun glow sprite -----------------------------------------------------
+
+function makeGlowTexture(): CanvasTexture {
+  const size = 128;
+  const c = document.createElement('canvas');
+  c.width = size;
+  c.height = size;
+  const ctx = c.getContext('2d')!;
+  const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.25, 'rgba(255,244,214,0.8)');
+  g.addColorStop(0.6, 'rgba(255,228,170,0.25)');
+  g.addColorStop(1, 'rgba(255,228,170,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, size, size);
+  return new CanvasTexture(c);
+}
+
+function SunGlow({ theme, extent }: { theme: MoodTheme; extent: number }) {
+  const spriteRef = useRef<Sprite>(null);
+  const tex = useMemo(() => makeGlowTexture(), []);
+  useEffect(() => () => tex.dispose(), [tex]);
+
+  // Place the glow far away along the sun direction.
+  const dir = theme.sunPosition;
+  const dlen = Math.hypot(dir[0], dir[1], dir[2]) || 1;
+  const dist = Math.max(220, extent * 3.2);
+  const pos: [number, number, number] = [
+    (dir[0] / dlen) * dist,
+    (dir[1] / dlen) * dist * 0.9,
+    (dir[2] / dlen) * dist,
+  ];
+  const size = Math.max(120, extent * 1.6);
+
+  useFrame((state) => {
+    if (spriteRef.current) {
+      const t = state.clock.elapsedTime;
+      const s = size * (1 + Math.sin(t * 0.4) * 0.04);
+      spriteRef.current.scale.set(s, s, 1);
+    }
+  });
+
+  return (
+    <sprite ref={spriteRef} position={pos} scale={[size, size, 1]}>
+      <spriteMaterial
+        map={tex}
+        color={theme.sun}
+        transparent
+        depthWrite={false}
+        depthTest={false}
+        opacity={0.7}
+        fog={false}
+        toneMapped={false}
+      />
+    </sprite>
   );
 }
 
@@ -114,10 +312,9 @@ function MagicSparkles({ magic, extent }: SparklesProps) {
   const pointsRef = useRef<Points>(null);
 
   const count = Math.min(360, Math.round((magic - 55) * 7));
-  const size = 0.5 + (magic - 55) / 60; // bigger/brighter with more magic
+  const size = 0.5 + (magic - 55) / 60;
   const opacity = Math.min(0.95, 0.45 + (magic - 55) / 120);
 
-  // Static base positions + per-particle speed/phase. Y is animated each frame.
   const { geometry, meta } = useMemo(() => {
     const positions = new Float32Array(count * 3);
     const m: { baseY: number; speed: number; phase: number }[] = [];
@@ -140,8 +337,6 @@ function MagicSparkles({ magic, extent }: SparklesProps) {
     return { geometry: g, meta: m };
   }, [count, extent]);
 
-  // Dispose the GPU buffers when this geometry instance is replaced (magic
-  // crossing thresholds across day ticks) or the component unmounts.
   useEffect(() => () => geometry.dispose(), [geometry]);
 
   useFrame((state) => {
@@ -152,7 +347,6 @@ function MagicSparkles({ magic, extent }: SparklesProps) {
     const ceiling = 16;
     for (let i = 0; i < meta.length; i++) {
       const m = meta[i];
-      // Drift upward and wrap to the floor; gentle horizontal shimmer via Y only.
       let y = m.baseY + ((t * m.speed) % ceiling);
       if (y > ceiling) y -= ceiling;
       attr.setY(i, y + Math.sin(t + m.phase) * 0.2);
@@ -165,7 +359,7 @@ function MagicSparkles({ magic, extent }: SparklesProps) {
   return (
     <points ref={pointsRef} geometry={geometry}>
       <pointsMaterial
-        color={'#c9b3ff'}
+        color={'#d8c4ff'}
         size={size}
         sizeAttenuation
         transparent
@@ -187,13 +381,11 @@ function MoodLights({ mood, theme }: { mood: CityMood; theme: MoodTheme }) {
     const sun = sunRef.current;
     if (!sun) return;
     if (mood === 'arcane') {
-      // Slow, dreamy ambient pulse for the arcane twilight.
       const t = state.clock.elapsedTime;
-      sun.intensity = baseIntensity * (1 + Math.sin(t * 0.8) * 0.18);
+      sun.intensity = baseIntensity * (1 + Math.sin(t * 0.8) * 0.12);
     } else if (mood === 'chaotic') {
-      // Restless flicker.
       const t = state.clock.elapsedTime;
-      sun.intensity = baseIntensity * (1 + Math.sin(t * 5.3) * 0.06 + Math.sin(t * 11.7) * 0.03);
+      sun.intensity = baseIntensity * (1 + Math.sin(t * 5.3) * 0.05 + Math.sin(t * 11.7) * 0.025);
     } else if (sun.intensity !== baseIntensity) {
       sun.intensity = baseIntensity;
     }
@@ -212,19 +404,21 @@ function MoodLights({ mood, theme }: { mood: CityMood; theme: MoodTheme }) {
         intensity={baseIntensity}
         position={theme.sunPosition}
         castShadow
-        shadow-mapSize-width={1024}
-        shadow-mapSize-height={1024}
+        shadow-mapSize-width={2048}
+        shadow-mapSize-height={2048}
+        shadow-bias={-0.0004}
+        shadow-radius={4}
         shadow-camera-near={1}
-        shadow-camera-far={250}
-        shadow-camera-left={-90}
-        shadow-camera-right={90}
-        shadow-camera-top={90}
-        shadow-camera-bottom={-90}
+        shadow-camera-far={400}
+        shadow-camera-left={-140}
+        shadow-camera-right={140}
+        shadow-camera-top={140}
+        shadow-camera-bottom={-140}
       />
       {/* Cool fill from the opposite side keeps shadows from going pure black. */}
       <directionalLight
         color={theme.ambient}
-        intensity={baseIntensity * 0.25}
+        intensity={baseIntensity * 0.35}
         position={[-theme.sunPosition[0], theme.sunPosition[1] * 0.6, -theme.sunPosition[2]]}
       />
     </>
@@ -234,12 +428,13 @@ function MoodLights({ mood, theme }: { mood: CityMood; theme: MoodTheme }) {
 export function Atmosphere({ mood, stats, theme, extent, center }: AtmosphereProps) {
   // Fog + background are driven imperatively in CityScene's SceneFog so mood
   // changes don't remount the scene graph. Here we own the lights + effects.
-  // Smog/sparkles are anchored on the city's center (lights stay put so the
-  // shadow frustum keeps covering the world origin area).
   return (
     <>
       <MoodLights mood={mood} theme={theme} />
+      <SunGlow theme={theme} extent={extent} />
       <group position={[center.x, 0, center.z]}>
+        <Clouds theme={theme} extent={extent} />
+        <Birds extent={extent} />
         {stats.pollution > 55 && <Smog pollution={stats.pollution} extent={extent} />}
         {stats.magic > 55 && <MagicSparkles magic={stats.magic} extent={extent} />}
       </group>

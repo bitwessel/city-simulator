@@ -73,6 +73,9 @@ export function EventModal({ city, event }: { city: City; event: ActiveEvent }) 
         aria-modal="true"
         onClick={(e) => e.stopPropagation()}
       >
+        <span className="memo__seal" aria-hidden title="Sealed by the city council">
+          ✦
+        </span>
         <span className="memo__stamp">Day {event.day}</span>
         <div className="memo__kicker">Council Memorandum</div>
         <h2 className="memo__title">{event.title}</h2>

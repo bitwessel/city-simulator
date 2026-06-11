@@ -100,15 +100,17 @@ export interface MoodMeta {
   color: string;
 }
 
+// Colors chosen to read as a word chip over the light frosted panels (used as
+// text on a faint tint), so they lean a touch deeper than the renderer hues.
 export const MOOD_META: Record<CityMood, MoodMeta> = {
-  thriving: { label: 'Thriving', icon: '🌟', color: '#f2c14e' },
-  serene: { label: 'Serene', icon: '🕊️', color: '#8fc7d6' },
-  gritty: { label: 'Gritty', icon: '⚒️', color: '#b08a5e' },
-  chaotic: { label: 'Chaotic', icon: '🌀', color: '#d96c4f' },
-  arcane: { label: 'Arcane', icon: '🔮', color: '#b07fd6' },
-  polluted: { label: 'Polluted', icon: '🌫️', color: '#8a8f5a' },
-  festive: { label: 'Festive', icon: '🎉', color: '#e58bb0' },
-  declining: { label: 'Declining', icon: '🥀', color: '#9c7a6a' },
+  thriving: { label: 'Thriving', icon: '🌟', color: '#b9821f' },
+  serene: { label: 'Serene', icon: '🕊️', color: '#3f86a3' },
+  gritty: { label: 'Gritty', icon: '⚒️', color: '#8a6238' },
+  chaotic: { label: 'Chaotic', icon: '🌀', color: '#c45236' },
+  arcane: { label: 'Arcane', icon: '🔮', color: '#8a52c0' },
+  polluted: { label: 'Polluted', icon: '🌫️', color: '#73773f' },
+  festive: { label: 'Festive', icon: '🎉', color: '#c25b87' },
+  declining: { label: 'Declining', icon: '🥀', color: '#8a5f4a' },
 };
 
 // ----- District types -------------------------------------------------------
@@ -174,11 +176,13 @@ export function riskLabel(kind: RiskKind): string {
 
 export type OutcomeTone = 'triumphant' | 'bittersweet' | 'catastrophic' | 'weird';
 
+// Used as title/kicker text and panel borders over light parchment, so these
+// run a little deeper than the pure renderer accents to stay legible.
 export const OUTCOME_TONE_COLOR: Record<OutcomeTone, string> = {
-  triumphant: '#f2c14e',
-  bittersweet: '#c79bd6',
-  catastrophic: '#d97a6c',
-  weird: '#8fd6c7',
+  triumphant: '#b9821f',
+  bittersweet: '#9159b8',
+  catastrophic: '#c0503a',
+  weird: '#2f9d86',
 };
 
 export const OUTCOME_KIND_ICON: Record<OutcomeKind, string> = {

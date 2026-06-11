@@ -9,51 +9,52 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  /* Warm storybook dawn: peach sky melting into a rosy horizon. */
   background:
-    radial-gradient(ellipse at 50% 120%, #3a2a4d 0%, transparent 55%),
-    radial-gradient(ellipse at 20% 0%, #1c2a4a 0%, transparent 50%),
-    linear-gradient(180deg, #0a0d18 0%, #141a2c 45%, #1d2438 100%);
+    radial-gradient(ellipse at 50% 118%, var(--mm-dawn-3) 0%, transparent 58%),
+    radial-gradient(ellipse at 22% 4%, #fff4dc 0%, transparent 48%),
+    linear-gradient(180deg, #fce9c6 0%, #f6cfa6 46%, #e9b9c0 100%);
 }
 
-/* Distant hill silhouette + city skyline at the bottom. */
+/* Warm sun-glow + soft hill silhouette at the bottom. */
 .start::after {
   content: '';
   position: absolute;
   inset: auto 0 0 0;
-  height: 26vh;
+  height: 28vh;
   background:
-    radial-gradient(60% 100% at 50% 100%, rgba(201, 162, 75, 0.16), transparent 70%),
-    linear-gradient(180deg, transparent, #090b14 85%);
+    radial-gradient(58% 100% at 50% 100%, rgba(240, 199, 94, 0.35), transparent 72%),
+    linear-gradient(180deg, transparent, rgba(122, 90, 58, 0.28) 92%);
   pointer-events: none;
 }
 
-/* Twinkling star field — two layered radial-gradient "fields". */
+/* Soft golden motes drifting in the dawn light (gentle, not starry). */
 .start__stars {
   position: absolute;
   inset: 0;
   pointer-events: none;
   background-repeat: repeat;
   background-image:
-    radial-gradient(1px 1px at 20% 30%, rgba(255, 255, 255, 0.9), transparent),
-    radial-gradient(1px 1px at 70% 18%, rgba(255, 255, 255, 0.7), transparent),
-    radial-gradient(1.5px 1.5px at 40% 60%, rgba(255, 246, 220, 0.9), transparent),
-    radial-gradient(1px 1px at 85% 50%, rgba(255, 255, 255, 0.8), transparent),
-    radial-gradient(1px 1px at 12% 75%, rgba(255, 255, 255, 0.6), transparent),
-    radial-gradient(1.5px 1.5px at 60% 80%, rgba(255, 246, 220, 0.85), transparent),
-    radial-gradient(1px 1px at 33% 12%, rgba(255, 255, 255, 0.7), transparent),
-    radial-gradient(1px 1px at 92% 88%, rgba(255, 255, 255, 0.6), transparent);
+    radial-gradient(2px 2px at 20% 30%, rgba(255, 244, 210, 0.9), transparent),
+    radial-gradient(1.5px 1.5px at 70% 18%, rgba(255, 235, 190, 0.7), transparent),
+    radial-gradient(2.5px 2.5px at 40% 60%, rgba(255, 247, 220, 0.8), transparent),
+    radial-gradient(1.5px 1.5px at 85% 50%, rgba(255, 240, 200, 0.7), transparent),
+    radial-gradient(2px 2px at 12% 75%, rgba(255, 244, 210, 0.6), transparent),
+    radial-gradient(2.5px 2.5px at 60% 80%, rgba(255, 247, 220, 0.75), transparent),
+    radial-gradient(1.5px 1.5px at 33% 12%, rgba(255, 235, 190, 0.6), transparent),
+    radial-gradient(2px 2px at 92% 88%, rgba(255, 244, 210, 0.55), transparent);
   background-size: 100% 100%;
-  animation: start-twinkle 5.5s ease-in-out infinite;
+  animation: start-twinkle 6.5s ease-in-out infinite;
 }
 .start__stars--slow {
-  opacity: 0.55;
-  animation-duration: 8.5s;
+  opacity: 0.5;
+  animation-duration: 9.5s;
   animation-delay: -2s;
-  filter: blur(0.3px);
+  filter: blur(0.6px);
 }
 @keyframes start-twinkle {
-  0%, 100% { opacity: 0.85; }
-  50% { opacity: 0.35; }
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 0.3; }
 }
 
 /* Floating lanterns drifting upward. */
@@ -81,42 +82,50 @@
   position: relative;
   z-index: 2;
   width: min(560px, 92vw);
-  padding: 44px 48px 40px;
+  padding: 48px 48px 40px;
   text-align: center;
-  border-radius: 18px;
-  border: 1px solid rgba(201, 162, 75, 0.35);
-  background: rgba(18, 16, 24, 0.55);
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.6), inset 0 0 60px rgba(201, 162, 75, 0.04);
-  backdrop-filter: blur(7px);
-  animation: mm-pop-in 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+  border-radius: var(--mm-radius-xl);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  background: rgba(252, 246, 235, 0.82);
+  box-shadow: var(--mm-shadow-lift);
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+  backdrop-filter: blur(14px) saturate(1.1);
+  color: var(--mm-ink);
+  animation: mm-pop-in 0.5s var(--mm-ease);
 }
 
+.start__crest {
+  font-size: 2.6rem;
+  line-height: 1;
+  margin-bottom: 6px;
+  filter: drop-shadow(0 4px 10px rgba(122, 90, 58, 0.25));
+}
 .start__title {
-  font-family: var(--mm-serif);
+  font-family: var(--mm-display);
+  font-weight: 600;
   font-size: clamp(2.6rem, 6vw, 3.8rem);
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
   margin: 0;
   line-height: 1.05;
-  background: linear-gradient(180deg, #ffe9a8, var(--mm-brass) 60%, #a67c2e);
+  background: linear-gradient(180deg, #e0aa4a, var(--mm-brass) 55%, #9c6f28);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  text-shadow: 0 2px 30px rgba(231, 198, 110, 0.18);
 }
 .start__subtitle {
-  font-family: var(--mm-serif);
+  font-family: var(--mm-display);
   font-style: italic;
-  color: var(--mm-brass-bright);
+  font-weight: 500;
+  color: var(--mm-terracotta);
   margin: 10px 0 0;
-  font-size: 1.1rem;
-  opacity: 0.95;
+  font-size: var(--mm-fs-md);
 }
 .start__desc {
-  color: var(--mm-text-dim);
+  color: var(--mm-ink-soft);
   margin: 22px auto 28px;
-  max-width: 42ch;
-  line-height: 1.55;
-  font-size: 1rem;
+  max-width: 44ch;
+  line-height: 1.6;
+  font-size: var(--mm-fs-md);
 }
 
 .start__seed {
@@ -127,42 +136,45 @@
 }
 .start__seed-label {
   display: block;
-  font-size: 0.82rem;
+  font-size: var(--mm-fs-xs);
+  font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--mm-text-faint);
+  color: var(--mm-ink-faint);
   margin-bottom: 6px;
 }
 .start__seed-input {
   width: 100%;
   font-family: var(--mm-body);
-  font-size: 1rem;
-  padding: 11px 14px;
+  font-weight: 600;
+  font-size: var(--mm-fs-md);
+  padding: 12px 15px;
   border-radius: var(--mm-radius-sm);
-  border: 1px solid rgba(201, 162, 75, 0.4);
-  background: rgba(8, 9, 14, 0.6);
-  color: var(--mm-text);
+  border: 1px solid rgba(120, 92, 56, 0.3);
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--mm-ink);
   outline: none;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .start__seed-input::placeholder {
-  color: var(--mm-text-faint);
+  color: var(--mm-ink-faint);
   font-style: italic;
+  font-weight: 500;
 }
 .start__seed-input:focus {
-  border-color: var(--mm-brass-bright);
-  box-shadow: 0 0 0 3px rgba(231, 198, 110, 0.18);
+  border-color: var(--mm-brass);
+  box-shadow: 0 0 0 3px rgba(224, 170, 74, 0.25);
 }
 
 .start__create {
-  font-size: 1.2rem;
-  padding: 14px 30px;
+  font-size: var(--mm-fs-lg);
+  padding: 15px 30px;
   width: 100%;
   max-width: 360px;
 }
 .start__hint {
   margin: 18px 0 0;
-  font-size: 0.8rem;
-  color: var(--mm-text-faint);
+  font-size: var(--mm-fs-sm);
+  color: var(--mm-ink-faint);
   font-style: italic;
 }

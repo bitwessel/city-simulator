@@ -40,7 +40,7 @@ export function OutcomeScreen({ city }: { city: City }) {
         style={{ borderColor: color }}
       >
         <div className="chronicle__icon">{icon}</div>
-        <div className="chronicle__kicker" style={{ color: '#9a3b2e' }}>
+        <div className="chronicle__kicker" style={{ color: 'var(--mm-terracotta)' }}>
           {outcome.tone}
         </div>
         <h1 className="chronicle__title">{outcome.title}</h1>

@@ -1,6 +1,7 @@
 import type {
   BoundedStatKey,
   Building,
+  BuildingKind,
   City,
   CityQuirk,
   CityStats,
@@ -11,11 +12,19 @@ import type {
   Risk,
   RiskKind,
   Road,
+  TerrainData,
   WorldSeed,
 } from '../types';
 import { BOUNDED_STAT_KEYS } from '../types';
 import { Rng, hashSeed } from '../utils/rng';
 import { clampStat, distance } from '../utils/math';
+import {
+  MAX_DISTRICT_RADIUS,
+  addDistrictFlat,
+  generateTerrain,
+  isDistrictSiteOnLand,
+  isDistrictSiteRiverside,
+} from './terrain';
 import {
   BRIEFING_OPENERS,
   BRIEFING_PROBLEMS,
@@ -45,7 +54,10 @@ export function generateCity(seedRaw: string): City {
   const name = generateCityName(rng);
   const tagline = rng.pick(CITY_TAGLINES);
 
-  const districts = generateDistricts(rng);
+  // Terrain first: districts are placed onto it. Its own hashed sub-stream
+  // keeps the main rng sequence independent of terrain tuning.
+  const terrain = generateTerrain(seedRaw);
+  const districts = generateDistricts(rng, terrain);
   const roads = generateRoads(rng, districts);
   const factions = generateFactions(rng, districts);
   assignDominantFactions(districts, factions);
@@ -85,6 +97,9 @@ export function generateCity(seedRaw: string): City {
     outcomeStreaks: {},
     outcome: null,
     mood: 'serene',
+    foundingPopulation: stats.population,
+    lastDistrictFoundedDay: 0,
+    terrain,
   };
   city.history.push({ day: 1, stats: { ...stats } });
   city.mood = deriveCityMood(city.stats);
@@ -103,7 +118,7 @@ function generateCityName(rng: Rng): string {
 
 // ----- Districts -------------------------------------------------------------
 
-function generateDistricts(rng: Rng): District[] {
+function generateDistricts(rng: Rng, terrain: TerrainData): District[] {
   const count = rng.int(5, 8);
   // Old town is always present; the rest are drawn without replacement.
   const oldTown = DISTRICT_ARCHETYPES.find((d) => d.type === 'old-town')!;
@@ -112,58 +127,178 @@ function generateDistricts(rng: Rng): District[] {
   ).slice(0, count - 1);
   const picked = [oldTown, ...others];
 
-  // Lay districts out around the center with minimum spacing.
-  const positions = layoutPositions(rng, picked.length);
+  // Radii are rolled before layout: river clearance depends on the footprint.
+  const radii = picked.map(() => rng.range(9, 14));
+
+  // Lay districts out around the center with minimum spacing, off the river
+  // (harbors instead hug it) and away from steep patches.
+  const positions = layoutPositions(rng, picked, radii, terrain);
 
   return picked.map((arch, i) => {
-    const radius = rng.range(9, 14);
+    const radius = radii[i];
+    // Level the site so the cluster sits on a subtle plateau (flats are
+    // appended in district order — deterministic for a given seed).
+    addDistrictFlat(terrain, positions[i], radius);
     const wealth = rng.range(arch.wealthRange[0], arch.wealthRange[1]);
     const population = rng.int(300, 1400);
     // Cities start as young settlements and build up over the run. Old town
     // is the founding district, so it begins noticeably more established.
     const development =
       arch.type === 'old-town' ? rng.range(28, 40) : rng.range(8, 20);
-    const district: District = {
-      id: `district-${i}-${arch.type}`,
-      name: rng.pick(arch.names),
-      type: arch.type,
-      position: positions[i],
+    return makeDistrict(rng, arch, `district-${i}-${arch.type}`, positions[i], {
       radius,
-      population,
       wealth: clampStat(wealth),
-      mood: clampStat(rng.range(45, 70)),
+      population,
       development,
-      risks: startingDistrictRisks(rng, arch.type),
-      buildings: generateBuildings(rng, arch, positions[i], radius),
-      dominantFactionId: null,
-      visualStyle: { baseColor: arch.baseColor, accentColor: arch.accentColor },
-      quirks: [],
-    };
-    return district;
+      name: rng.pick(arch.names),
+    });
   });
 }
 
-function layoutPositions(rng: Rng, count: number): { x: number; z: number }[] {
-  const positions: { x: number; z: number }[] = [{ x: 0, z: 0 }];
-  const minGap = 24;
-  let angle = rng.range(0, Math.PI * 2);
-  for (let i = 1; i < count; i++) {
-    // Walk outward on a noisy spiral until we find a clear spot.
-    for (let attempt = 0; attempt < 40; attempt++) {
-      angle += rng.range(1.4, 2.6);
-      const dist = 22 + i * 6 + rng.range(-4, 8);
-      const candidate = {
-        x: Math.cos(angle) * dist,
-        z: Math.sin(angle) * dist * 0.8, // slightly squashed: looks better on screen
-      };
-      if (positions.every((p) => distance(p, candidate) >= minGap)) {
-        positions.push(candidate);
-        break;
-      }
-      if (attempt === 39) positions.push(candidate);
-    }
+/**
+ * The minimum centre-to-centre spacing between district footprints. Exported
+ * so the engine can place mid-run districts on the same grid the generator uses.
+ */
+export const DISTRICT_MIN_GAP = 24;
+
+/**
+ * Build a single district from an archetype at a given position. Shared by the
+ * initial generator and the engine's mid-run city expansion so both produce
+ * structurally identical districts (radius, building roster, risks...).
+ */
+export function makeDistrict(
+  rng: Rng,
+  arch: DistrictArchetype,
+  id: string,
+  position: { x: number; z: number },
+  opts: {
+    radius: number;
+    wealth: number;
+    population: number;
+    development: number;
+    name: string;
+  },
+): District {
+  const mood = clampStat(rng.range(45, 70));
+  const risks = startingDistrictRisks(rng, arch.type);
+  // Buildings draw from a dedicated forked sub-stream keyed off the district id,
+  // so the (now much denser) building layout doesn't perturb the RNG sequence
+  // the rest of generation (stats, factions...) depends on. Still fully
+  // deterministic: same seed ⇒ same fork seed ⇒ same buildings.
+  const buildRng = rng.fork(`buildings:${id}`);
+  return {
+    id,
+    name: opts.name,
+    type: arch.type,
+    position,
+    radius: opts.radius,
+    population: opts.population,
+    wealth: clampStat(opts.wealth),
+    mood,
+    development: opts.development,
+    risks,
+    buildings: generateBuildings(buildRng, arch, position, opts.radius, id),
+    dominantFactionId: null,
+    visualStyle: { baseColor: arch.baseColor, accentColor: arch.accentColor },
+    quirks: [],
+  };
+}
+
+function layoutPositions(
+  rng: Rng,
+  picked: DistrictArchetype[],
+  radii: number[],
+  terrain: TerrainData,
+): { x: number; z: number }[] {
+  const positions: { x: number; z: number }[] = [
+    firstDistrictPosition(terrain, radii[0]),
+  ];
+  for (let i = 1; i < picked.length; i++) {
+    positions.push(
+      nextDistrictPosition(rng, positions, i, {
+        terrain,
+        radius: radii[i],
+        nearRiver: picked[i].type === 'harbor',
+      }),
+    );
   }
   return positions;
+}
+
+/**
+ * The founding district (old town) prefers the map origin. The river is
+ * generated to keep clear of it, but if the origin still fails the land check
+ * (a steep patch, an unlucky meander) walk a deterministic golden-angle
+ * spiral outward until a valid site appears. No rng: pure from the terrain.
+ */
+function firstDistrictPosition(
+  terrain: TerrainData,
+  radius: number,
+): { x: number; z: number } {
+  for (let k = 0; k < 80; k++) {
+    const r = k * 3;
+    const a = k * 2.39996; // golden angle
+    const candidate = { x: Math.cos(a) * r, z: Math.sin(a) * r };
+    if (isDistrictSiteOnLand(terrain, candidate, radius)) return candidate;
+  }
+  return { x: 0, z: 0 };
+}
+
+/** Optional terrain constraints for `nextDistrictPosition`. */
+export interface SiteOptions {
+  terrain?: TerrainData;
+  /** Footprint radius of the district being placed (clearance margin). */
+  radius?: number;
+  /** Prefer a riverside site (harbors hug the water). */
+  nearRiver?: boolean;
+}
+
+/**
+ * Find the next district centre on the noisy outward spiral, keeping at least
+ * `DISTRICT_MIN_GAP` from every existing position and (when terrain is given)
+ * off the river channel and steep ground — harbors instead *seek* the bank.
+ * Exported so the engine can place newly-founded districts adjacent to the
+ * current layout deterministically. `ring` controls how far out the candidate
+ * starts (use the current district count for natural outward growth).
+ */
+export function nextDistrictPosition(
+  rng: Rng,
+  existing: { x: number; z: number }[],
+  ring: number,
+  opts: SiteOptions = {},
+): { x: number; z: number } {
+  const { terrain, nearRiver = false } = opts;
+  const radius = opts.radius ?? MAX_DISTRICT_RADIUS;
+  let angle = rng.range(0, Math.PI * 2);
+  let candidate = { x: 0, z: 0 };
+  // Fallbacks, best first: a spacing-respecting land site (a harbor that found
+  // no bank settles for dry land), then any spacing-respecting candidate.
+  let landFallback: { x: number; z: number } | null = null;
+  let spacedFallback: { x: number; z: number } | null = null;
+  for (let attempt = 0; attempt < 70; attempt++) {
+    angle += rng.range(1.4, 2.6);
+    // Push progressively further out on later attempts so a clear, spacing-
+    // respecting spot is found even for a crowded, well-expanded layout.
+    const dist = 22 + ring * 6 + attempt * 1.2 + rng.range(-4, 8);
+    candidate = {
+      x: Math.cos(angle) * dist,
+      z: Math.sin(angle) * dist * 0.8, // slightly squashed: looks better on screen
+    };
+    if (!existing.every((p) => distance(p, candidate) >= DISTRICT_MIN_GAP)) {
+      continue;
+    }
+    if (!terrain) return candidate;
+    if (!spacedFallback) spacedFallback = candidate;
+    if (nearRiver) {
+      if (isDistrictSiteRiverside(terrain, candidate, radius)) return candidate;
+      if (!landFallback && isDistrictSiteOnLand(terrain, candidate, radius)) {
+        landFallback = candidate;
+      }
+    } else if (isDistrictSiteOnLand(terrain, candidate, radius)) {
+      return candidate;
+    }
+  }
+  return landFallback ?? spacedFallback ?? candidate;
 }
 
 function startingDistrictRisks(
@@ -188,34 +323,96 @@ function startingDistrictRisks(
   return base;
 }
 
+/** Minimum centre-to-centre spacing between buildings in a district. */
+const BUILDING_MIN_GAP = 2.65;
+
+/** Per-kind floor ranges for the tall "skyscraper era" building kinds. */
+const TALL_FLOOR_RANGE: Partial<Record<BuildingKind, [number, number]>> = {
+  apartment: [3, 5],
+  'grand-hall': [4, 9],
+  'arcane-spire': [6, 14],
+  skyscraper: [6, 16],
+};
+
+/** The minimum development at which a given tall kind is allowed to appear. */
+function tallAppearFloor(kind: BuildingKind): number {
+  if (kind === 'skyscraper') return 0.82;
+  if (kind === 'arcane-spire') return 0.8;
+  if (kind === 'grand-hall') return 0.74;
+  return 0.7; // apartment (mid-rise)
+}
+
+/**
+ * Rejection-sample a building position inside a disc of radius `maxR` around
+ * `center` that is at least `BUILDING_MIN_GAP` from every already-placed
+ * building. Returns null if no clear spot is found within `attempts` tries,
+ * so callers can skip rather than overlap (avoids z-fighting piles).
+ */
+function sampleBuildingPosition(
+  rng: Rng,
+  center: { x: number; z: number },
+  maxR: number,
+  placed: Building[],
+  attempts: number,
+): { x: number; z: number } | null {
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    const a = rng.range(0, Math.PI * 2);
+    const r = Math.sqrt(rng.next()) * maxR;
+    const candidate = { x: center.x + Math.cos(a) * r, z: center.z + Math.sin(a) * r };
+    if (placed.every((b) => distance(b.position, candidate) >= BUILDING_MIN_GAP)) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
 /**
  * Generate the district's *fully grown* building layout. Each building gets an
  * `appearAt` development threshold; the renderer only shows buildings the
  * district has "built" so far, so the city visibly grows over a run.
+ *
+ * The roster is dense (≈22-34, scaled by radius) with `appearAt` spread across
+ * the full 0..1 range, so a late-game urban district looks genuinely built up.
+ * Urban districts additionally plan a handful of tall buildings (apartments,
+ * skyscrapers, grand halls, arcane spires) at high `appearAt` — the
+ * "skyscraper era" that only arrives once a district is heavily developed.
+ * Exported so the engine can pre-plan rosters for mid-run founded districts.
  */
-function generateBuildings(
+export function generateBuildings(
   rng: Rng,
   arch: DistrictArchetype,
   center: { x: number; z: number },
   radius: number,
+  /**
+   * Prefix for building ids; defaults to the district type. Pass the district
+   * id when districts of the same type can coexist (mid-run founded duplicates)
+   * so building ids stay globally unique for the renderer.
+   */
+  idPrefix: string = arch.type,
 ): Building[] {
-  const count = rng.int(14, 20);
   const buildings: Building[] = [];
+
+  // ----- Skyscraper era: plan tall buildings FIRST so they claim prime,
+  // central spots before the low-rise sprawl packs the district full. Their
+  // (high) appearAt is assigned here; the distance-based ramp below skips them.
+  if (arch.urban && arch.tallKinds && arch.tallKinds.length > 0) {
+    planTallBuildings(rng, arch, center, radius, buildings, idPrefix);
+  }
+  const tallCount = buildings.length;
+
+  // ----- Low-rise roster, dense and scaled by footprint (a small district
+  // gets ~22, a big one ~34). Skip any building that can't find a clear spot
+  // rather than piling it on (which would give the renderer z-fighting heaps).
+  const radiusT = clampStat(((radius - 9) / 5) * 100) / 100; // 0..1 over 9..14
+  const count = Math.round(rng.range(22, 26) + radiusT * 8 + rng.range(0, 2));
   for (let i = 0; i < count; i++) {
-    // Rejection-sample positions so buildings cluster but do not overlap much.
-    let pos = center;
-    for (let attempt = 0; attempt < 18; attempt++) {
-      const a = rng.range(0, Math.PI * 2);
-      const r = Math.sqrt(rng.next()) * (radius - 2.5);
-      const candidate = { x: center.x + Math.cos(a) * r, z: center.z + Math.sin(a) * r };
-      if (buildings.every((b) => distance(b.position, candidate) >= 2.8)) {
-        pos = candidate;
-        break;
-      }
-      pos = candidate;
-    }
+    // Margin 2.2 (was 2.5 in the platform-disc era — clusters on open terrain
+    // don't need a cliff-edge buffer) + 40 attempts: small districts pack
+    // tightly and need both to reliably reach their dense roster.
+    const pos = sampleBuildingPosition(rng, center, radius - 2.2, buildings, 40);
+    if (!pos) continue;
     buildings.push({
-      id: `b-${arch.type}-${i}`,
+      id: `b-${idPrefix}-${i}`,
       kind: rng.pick(arch.buildingKinds),
       position: pos,
       rotation: rng.range(0, Math.PI * 2),
@@ -224,21 +421,97 @@ function generateBuildings(
     });
   }
 
-  // Growth spreads outward from the district heart: the few buildings closest
-  // to the center form the founding cluster, the rest fill in by distance with
-  // a little jitter so rings don't complete too neatly.
-  const byDistance = [...buildings].sort(
+  // Growth spreads outward from the district heart: the few low-rise buildings
+  // closest to the center form the founding cluster, the rest fill in by
+  // distance across the full 0..1 range with a little jitter so rings don't
+  // complete too neatly. Tall buildings keep their own high appearAt.
+  const lowRise = buildings.slice(tallCount);
+  const byDistance = [...lowRise].sort(
     (a, b) => distance(a.position, center) - distance(b.position, center),
   );
   byDistance.forEach((b, rank) => {
     if (rank < 3) {
       b.appearAt = 0;
     } else {
-      const t = (rank - 2) / (byDistance.length - 2);
-      b.appearAt = Math.min(1, Math.max(0.05, t * 0.92 + rng.range(-0.06, 0.06)));
+      const t = (rank - 2) / Math.max(1, byDistance.length - 2); // 0..1
+      b.appearAt = Math.min(1, Math.max(0.05, t + rng.range(-0.05, 0.05)));
     }
   });
+
   return buildings;
+}
+
+/**
+ * Plan a district's tall buildings. Wealthier/larger districts get more of
+ * them. Each is placed (preferring open spots near the centre) and assigned a
+ * high `appearAt` so it only rises once the district is heavily developed.
+ */
+function planTallBuildings(
+  rng: Rng,
+  arch: DistrictArchetype,
+  center: { x: number; z: number },
+  radius: number,
+  buildings: Building[],
+  idPrefix: string,
+): void {
+  const tallKinds = arch.tallKinds!;
+  // Wealth/size scale the count. The wealthRange midpoint stands in for the
+  // district's prosperity (the actual wealth is rolled separately but tracks it).
+  const wealthMid = (arch.wealthRange[0] + arch.wealthRange[1]) / 2;
+  const wealthT = clampStat(wealthMid) / 100; // 0..1
+  const radiusT = clampStat(((radius - 9) / 5) * 100) / 100;
+  const base = 2 + Math.round(wealthT * 4 + radiusT * 3); // ~2..9
+  const tallCount = base + rng.int(0, 2);
+
+  for (let i = 0; i < tallCount; i++) {
+    const kind = rng.pick(tallKinds);
+    // Place the tall building, biased toward the dense heart of the district.
+    // Skip if there's no clear spot — better a few fewer towers than overlap.
+    const pos = sampleBuildingPosition(
+      rng,
+      center,
+      (radius - 2.5) * 0.85,
+      buildings,
+      26,
+    );
+    if (!pos) continue;
+    const floorRange = TALL_FLOOR_RANGE[kind] ?? [3, 6];
+    const floors = rng.int(floorRange[0], floorRange[1]);
+    const floor = tallAppearFloor(kind);
+    // High appearAt, spread a little so they don't all rise on the same day.
+    const appearAt = Math.min(0.99, floor + rng.range(0, 1 - floor) * 0.7);
+    buildings.push({
+      id: `b-${idPrefix}-tall-${i}`,
+      kind,
+      position: pos,
+      rotation: rng.range(0, Math.PI * 2),
+      scale: rng.range(0.9, 1.3),
+      appearAt,
+      floors,
+    });
+  }
+}
+
+/**
+ * Find the existing district nearest to `from` (excluding itself). Exported for
+ * the engine, which connects each newly-founded district to its closest
+ * neighbour by road. Returns null only if there is no other district.
+ */
+export function nearestDistrict(
+  from: District,
+  districts: District[],
+): District | null {
+  let best: District | null = null;
+  let bestDist = Infinity;
+  for (const d of districts) {
+    if (d.id === from.id) continue;
+    const dist = distance(from.position, d.position);
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = d;
+    }
+  }
+  return best;
 }
 
 function generateRoads(rng: Rng, districts: District[]): Road[] {

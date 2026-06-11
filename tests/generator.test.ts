@@ -1,7 +1,34 @@
 import { describe, expect, it } from 'vitest';
+import type { BuildingKind, DistrictType } from '../src/types';
 import { generateCity } from '../src/generation/generator';
 import { BOUNDED_STAT_KEYS } from '../src/types';
+import { DISTRICT_ARCHETYPES } from '../src/generation/data/names';
 import { distance } from '../src/utils/math';
+
+// The tall "skyscraper era" kinds and their documented invariants.
+const TALL_KINDS = new Set<BuildingKind>([
+  'apartment',
+  'grand-hall',
+  'arcane-spire',
+  'skyscraper',
+]);
+const TALL_MIN_APPEAR: Record<string, number> = {
+  apartment: 0.7,
+  'grand-hall': 0.74,
+  'arcane-spire': 0.8,
+  skyscraper: 0.82,
+};
+const TALL_FLOOR_RANGE: Record<string, [number, number]> = {
+  apartment: [3, 5],
+  'grand-hall': [4, 9],
+  'arcane-spire': [6, 14],
+  skyscraper: [6, 16],
+};
+const URBAN_TYPES = new Set<DistrictType>(
+  DISTRICT_ARCHETYPES.filter((a) => a.urban).map((a) => a.type),
+);
+// Minimum building spacing the generator promises (slightly relaxed for FP).
+const MIN_BUILDING_GAP = 2.6;
 
 describe('procedural city generator', () => {
   it('produces an identical city for the same seed', () => {
@@ -116,6 +143,83 @@ describe('procedural city generator', () => {
           expect(city.districts.some((d) => d.id === faction.homeDistrictId)).toBe(true);
         }
       }
+    }
+  });
+});
+
+describe('district density and the skyscraper era', () => {
+  it('plans dense rosters with appearAt spread across the full range', () => {
+    for (let i = 0; i < 25; i++) {
+      const city = generateCity(`density-${i}`);
+      for (const district of city.districts) {
+        // Dense rosters with late-game construction near development 1.0. The
+        // floor is the radius-9 worst case: with the promised 2.65 building
+        // gap, the smallest footprint geometrically saturates around 14-17.
+        expect(district.buildings.length).toBeGreaterThanOrEqual(14);
+        const maxAppear = Math.max(...district.buildings.map((b) => b.appearAt));
+        expect(maxAppear).toBeGreaterThan(0.8);
+
+        // Buildings keep a reasonable minimum spacing (no z-fighting piles).
+        for (let a = 0; a < district.buildings.length; a++) {
+          for (let b = a + 1; b < district.buildings.length; b++) {
+            const gap = distance(
+              district.buildings[a].position,
+              district.buildings[b].position,
+            );
+            expect(gap).toBeGreaterThanOrEqual(MIN_BUILDING_GAP);
+          }
+        }
+      }
+    }
+  });
+
+  it('only plans tall buildings in urban districts, late, with valid floors', () => {
+    let sawTall = false;
+    for (let i = 0; i < 40; i++) {
+      const city = generateCity(`tall-${i}`);
+      for (const district of city.districts) {
+        for (const b of district.buildings) {
+          if (TALL_KINDS.has(b.kind)) {
+            sawTall = true;
+            // Tall kinds only in urban district types.
+            expect(URBAN_TYPES.has(district.type), `${b.kind} in ${district.type}`).toBe(true);
+            // arcane-spire is the only tall kind allowed in magical districts,
+            // and only appears in academy/magical.
+            if (b.kind === 'arcane-spire') {
+              expect(['academy', 'magical']).toContain(district.type);
+            }
+            if (district.type === 'magical') {
+              expect(b.kind).toBe('arcane-spire');
+            }
+            // High appearAt — the skyscraper era only arrives once developed.
+            expect(b.appearAt).toBeGreaterThanOrEqual(TALL_MIN_APPEAR[b.kind] - 1e-9);
+            expect(b.appearAt).toBeLessThanOrEqual(1);
+            // Floors present and within the documented range for the kind.
+            const range = TALL_FLOOR_RANGE[b.kind];
+            expect(b.floors).toBeDefined();
+            expect(b.floors!).toBeGreaterThanOrEqual(range[0]);
+            expect(b.floors!).toBeLessThanOrEqual(range[1]);
+          } else {
+            // Classic low-rise kinds never carry a floor count.
+            expect(b.floors).toBeUndefined();
+          }
+        }
+      }
+    }
+    expect(sawTall, 'expected at least one tall building across seeds').toBe(true);
+  });
+
+  it('plans tall buildings for every urban district type that appears', () => {
+    // Across many seeds, every urban archetype should eventually grow talls.
+    const sawTallFor = new Set<DistrictType>();
+    for (let i = 0; i < 60; i++) {
+      const city = generateCity(`urban-${i}`);
+      for (const d of city.districts) {
+        if (d.buildings.some((b) => TALL_KINDS.has(b.kind))) sawTallFor.add(d.type);
+      }
+    }
+    for (const type of URBAN_TYPES) {
+      expect(sawTallFor.has(type), `no tall buildings ever planned for ${type}`).toBe(true);
     }
   });
 });
