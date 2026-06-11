@@ -28,6 +28,11 @@ export interface GameStore {
   eventOpen: boolean;
   selectedDistrictId: string | null;
   selectedFactionId: string | null;
+  /**
+   * Mobile only: whether the city/districts/factions panel popup is open. On
+   * desktop the panel is always docked, so this flag is ignored there.
+   */
+  panelOpen: boolean;
   /** Bumped on every new game so the 3D scene fully remounts. */
   runId: number;
 
@@ -47,6 +52,8 @@ export interface GameStore {
   startProject: (districtId: string, defId: string) => void;
   selectDistrict: (id: string | null) => void;
   selectFaction: (id: string | null) => void;
+  /** Mobile only: open/close the panel popup. */
+  setPanelOpen: (open: boolean) => void;
   dismissOutcome: () => void;
   backToStart: () => void;
 }
@@ -59,6 +66,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   eventOpen: false,
   selectedDistrictId: null,
   selectedFactionId: null,
+  panelOpen: false,
   runId: 0,
 
   newGame: (seedInput) => {
@@ -73,6 +81,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       eventOpen: false,
       selectedDistrictId: null,
       selectedFactionId: null,
+      panelOpen: false,
       runId: s.runId + 1,
     }));
   },
@@ -130,10 +139,21 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   selectDistrict: (id) =>
-    set({ selectedDistrictId: id, selectedFactionId: id ? null : get().selectedFactionId }),
+    set({
+      selectedDistrictId: id,
+      selectedFactionId: id ? null : get().selectedFactionId,
+      // On mobile, picking a district on the map pops the panel open to it.
+      panelOpen: id ? true : get().panelOpen,
+    }),
 
   selectFaction: (id) =>
-    set({ selectedFactionId: id, selectedDistrictId: id ? null : get().selectedDistrictId }),
+    set({
+      selectedFactionId: id,
+      selectedDistrictId: id ? null : get().selectedDistrictId,
+      panelOpen: id ? true : get().panelOpen,
+    }),
+
+  setPanelOpen: (open) => set({ panelOpen: open }),
 
   dismissOutcome: () => set({ screen: 'outcome' }),
 
@@ -145,6 +165,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       eventOpen: false,
       selectedDistrictId: null,
       selectedFactionId: null,
+      panelOpen: false,
       speed: 2,
     }),
 }));

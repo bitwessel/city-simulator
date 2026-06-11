@@ -44,6 +44,10 @@
   padding: 10px 16px;
   animation: mm-slide-down 0.45s var(--mm-ease);
 }
+/* Mobile-only panel launcher; the docked panel makes it redundant on desktop. */
+.topbar__menu {
+  display: none;
+}
 .topbar__identity {
   display: flex;
   flex-direction: column;
@@ -1357,4 +1361,121 @@
 @media (max-width: 1024px) {
   .game__overlay { grid-template-columns: minmax(260px, 300px) 1fr; }
   .topbar { flex-wrap: wrap; }
+}
+
+/* ===========================================================================
+   MOBILE / SMALL SCREENS (≤768px)
+   The 3D city owns the whole screen. The menus collapse into popups summoned
+   by small buttons, so nothing crowds the view.
+   =========================================================================== */
+@media (max-width: 768px) {
+  /* Single column — no docked left rail. Padding respects notch safe areas. */
+  .game__overlay {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      'top'
+      '.'
+      'controls';
+    gap: var(--mm-sp-2);
+    padding:
+      max(var(--mm-sp-2), env(safe-area-inset-top))
+      max(var(--mm-sp-2), env(safe-area-inset-right))
+      max(var(--mm-sp-2), env(safe-area-inset-bottom))
+      max(var(--mm-sp-2), env(safe-area-inset-left));
+  }
+
+  /* ----- Top bar: a slim row → [☰] [City · Day] … [mood] [📊] ----- */
+  .topbar {
+    flex-wrap: nowrap;
+    gap: var(--mm-sp-2);
+    padding: 7px 10px;
+  }
+  .topbar__menu {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--mm-radius-xs);
+    border: 1px solid var(--mm-glass-hairline);
+    background: rgba(255, 255, 255, 0.45);
+    color: var(--mm-ink);
+    font-size: 1.2rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .topbar__menu:active { background: rgba(255, 255, 255, 0.7); }
+  .topbar__identity {
+    flex: 1;
+    min-width: 0;
+    padding-right: var(--mm-sp-2);
+    border-right: none;
+  }
+  .topbar__city { font-size: var(--mm-fs-md); }
+  /* Day is enough up top; season detail still lives in the Vitals popover. */
+  .topbar__season,
+  .topbar__dot { display: none; }
+
+  /* The detailed vital chips hide behind the 📊 Vitals popover on mobile. */
+  .topbar__vitals { display: none; }
+
+  .topbar__right { gap: var(--mm-sp-1); margin-left: auto; }
+  .mood-badge { padding: 6px 10px; font-size: var(--mm-fs-sm); }
+  .mood-badge__icon { font-size: 1rem; }
+  .vitals-toggle { padding: 9px 11px; }
+
+  /* Vitals popover spans the screen width and scrolls when the grid is tall. */
+  .vitals-pop {
+    width: calc(100vw - 16px);
+    right: 0;
+    max-height: 72vh;
+    overflow-y: auto;
+  }
+
+  /* ----- Panel popup: a slide-up sheet from the bottom ----- */
+  .sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 46;
+    display: flex;
+    align-items: flex-end;
+    background: rgba(74, 53, 34, 0.34);
+    -webkit-backdrop-filter: blur(2px);
+    backdrop-filter: blur(2px);
+    animation: mm-fade-in 0.2s ease;
+  }
+  .leftpanel--sheet {
+    width: 100%;
+    max-height: 80vh;
+    border-radius: var(--mm-radius-xl) var(--mm-radius-xl) 0 0;
+    animation: sheet-rise 0.3s var(--mm-ease);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .leftpanel--sheet .leftpanel__collapse {
+    font-size: 1.1rem;
+    min-width: 40px;
+  }
+
+  /* ----- Control pill: compact; the day read-out lives in the top bar ----- */
+  .controls {
+    padding: 6px 8px;
+    gap: var(--mm-sp-1);
+  }
+  .ctrl-day { display: none; }
+  .ctrl-sep:last-of-type { display: none; }
+  .ctrl-btn--next__label { display: none; }
+  .ctrl-btn { height: 44px; min-width: 44px; }
+
+  /* ----- News ticker: lift clear of the control pill ----- */
+  .ticker {
+    right: var(--mm-sp-2);
+    bottom: calc(80px + env(safe-area-inset-bottom));
+    max-width: min(280px, calc(100vw - 16px));
+  }
+}
+
+@keyframes sheet-rise {
+  from { opacity: 0; transform: translateY(100%); }
+  to { opacity: 1; transform: translateY(0); }
 }

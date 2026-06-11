@@ -4,6 +4,7 @@ import { useGameStore } from '../state/store';
 import { CityTab } from './CityTab';
 import { DistrictsTab } from './DistrictsTab';
 import { FactionsTab } from './FactionsTab';
+import { MOBILE_QUERY, useMediaQuery } from './useMediaQuery';
 
 type TabKey = 'city' | 'districts' | 'factions';
 
@@ -13,14 +14,49 @@ const TABS: { key: TabKey; label: string; icon: string }[] = [
   { key: 'factions', label: 'Factions', icon: '⚖️' },
 ];
 
+/** The tab strip, shared by the docked desktop panel and the mobile sheet. */
+function TabStrip({ tab, setTab }: { tab: TabKey; setTab: (t: TabKey) => void }) {
+  return (
+    <div className="tabs" role="tablist">
+      {TABS.map((t) => (
+        <button
+          key={t.key}
+          role="tab"
+          aria-selected={tab === t.key}
+          className={`tab${tab === t.key ? ' tab--active' : ''}`}
+          onClick={() => setTab(t.key)}
+        >
+          <span className="tab__icon">{t.icon}</span>
+          <span className="tab__label">{t.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** The body for the active tab, shared by both layouts. */
+function TabBody({ tab, city }: { tab: TabKey; city: City }) {
+  return (
+    <>
+      {tab === 'city' && <CityTab city={city} />}
+      {tab === 'districts' && <DistrictsTab city={city} />}
+      {tab === 'factions' && <FactionsTab city={city} />}
+    </>
+  );
+}
+
 export function LeftPanel({ city }: { city: City }) {
+  const isMobile = useMediaQuery(MOBILE_QUERY);
   const [tab, setTab] = useState<TabKey>('city');
   const [collapsed, setCollapsed] = useState(false);
   const selectedDistrictId = useGameStore((s) => s.selectedDistrictId);
   const selectedFactionId = useGameStore((s) => s.selectedFactionId);
+  const panelOpen = useGameStore((s) => s.panelOpen);
+  const setPanelOpen = useGameStore((s) => s.setPanelOpen);
 
   // Follow selections made elsewhere (e.g. clicking a district in the 3D map)
   // so the relevant detail is always visible — and pop the panel open for it.
+  // (The store also flips panelOpen on selection for the mobile sheet.)
   useEffect(() => {
     if (selectedDistrictId) {
       setTab('districts');
@@ -33,6 +69,37 @@ export function LeftPanel({ city }: { city: City }) {
       setCollapsed(false);
     }
   }, [selectedFactionId]);
+
+  // Mobile: the panel lives in a slide-up popup launched from the top bar, so
+  // the 3D city owns the whole screen until summoned.
+  if (isMobile) {
+    if (!panelOpen) return null;
+    return (
+      <div className="sheet-backdrop" onClick={() => setPanelOpen(false)}>
+        <aside
+          className="leftpanel leftpanel--sheet mm-panel mm-panel--gloss"
+          onClick={(e) => e.stopPropagation()}
+          role="dialog"
+          aria-label="City panel"
+        >
+          <div className="leftpanel__head">
+            <TabStrip tab={tab} setTab={setTab} />
+            <button
+              className="leftpanel__collapse"
+              onClick={() => setPanelOpen(false)}
+              title="Close panel"
+              aria-label="Close panel"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="tabbody mm-scroll">
+            <TabBody tab={tab} city={city} />
+          </div>
+        </aside>
+      </div>
+    );
+  }
 
   // Collapsed state: a slim icon rail. Clicking an icon reopens that tab.
   if (collapsed) {
@@ -68,20 +135,7 @@ export function LeftPanel({ city }: { city: City }) {
   return (
     <aside className="leftpanel mm-panel mm-panel--gloss">
       <div className="leftpanel__head">
-        <div className="tabs" role="tablist">
-          {TABS.map((t) => (
-            <button
-              key={t.key}
-              role="tab"
-              aria-selected={tab === t.key}
-              className={`tab${tab === t.key ? ' tab--active' : ''}`}
-              onClick={() => setTab(t.key)}
-            >
-              <span className="tab__icon">{t.icon}</span>
-              <span className="tab__label">{t.label}</span>
-            </button>
-          ))}
-        </div>
+        <TabStrip tab={tab} setTab={setTab} />
         <button
           className="leftpanel__collapse"
           onClick={() => setCollapsed(true)}
@@ -92,9 +146,7 @@ export function LeftPanel({ city }: { city: City }) {
         </button>
       </div>
       <div className="tabbody mm-scroll">
-        {tab === 'city' && <CityTab city={city} />}
-        {tab === 'districts' && <DistrictsTab city={city} />}
-        {tab === 'factions' && <FactionsTab city={city} />}
+        <TabBody tab={tab} city={city} />
       </div>
     </aside>
   );

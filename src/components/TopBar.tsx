@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { City } from '../types';
+import { useGameStore } from '../state/store';
 import { MOOD_META, POPULATION_META, STAT_META } from './statMeta';
 import { formatCount, formatSigned, seasonFlavor, statTrend, trendArrow } from './format';
 import { CityVitals } from './CityVitals';
@@ -70,6 +71,7 @@ function FavorChip({ city }: { city: City }) {
 
 export function TopBar({ city }: { city: City }) {
   const [vitalsOpen, setVitalsOpen] = useState(false);
+  const setPanelOpen = useGameStore((s) => s.setPanelOpen);
   const mood = MOOD_META[city.mood];
   const season = seasonFlavor(city.day);
 
@@ -79,6 +81,16 @@ export function TopBar({ city }: { city: City }) {
 
   return (
     <header className="topbar mm-panel mm-panel--gloss">
+      {/* Mobile-only launcher for the city/districts/factions popup. */}
+      <button
+        className="topbar__menu"
+        onClick={() => setPanelOpen(true)}
+        title="Open city menu"
+        aria-label="Open city menu"
+      >
+        ☰
+      </button>
+
       <div className="topbar__identity">
         <span className="topbar__city">{city.name}</span>
         <span className="topbar__meta">
