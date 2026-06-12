@@ -30,6 +30,19 @@ export type PlayPolicy = 'good' | 'bad';
 // them should count against a choice's score (and vice-versa).
 const HIGH_IS_BAD = new Set(['chaos', 'pollution']);
 
+// Magic is good in moderation and an ending above 90 (the Shimmering). An
+// attentive mayor enjoys it low, goes neutral as it climbs, and actively
+// avoids feeding it near the singularity threshold — without this the "good"
+// policy happily amplifies +magic choices (x2.8) straight into a weird ending,
+// and the play-matters medians end up measuring survivorship composition
+// instead of steering quality. Thresholds sit well under the outcome's 90 gate.
+function magicWeight(city: City | undefined): number {
+  const magic = city?.stats.magic ?? 50;
+  if (magic < 60) return 1;
+  if (magic <= 75) return 0;
+  return -1;
+}
+
 // Faction satisfaction matters, but a single faction's mood is worth less than
 // a point of a city-wide stat — weight it modestly so stat effects dominate the
 // ranking (a choice that floods the treasury shouldn't be called "good" just
@@ -42,22 +55,25 @@ const POPULATION_WEIGHT = 0.02;
 
 /**
  * Deterministic desirability score for one choice, from its DECLARED effects
- * only (no dice are rolled to score — scoring must be pure so the policy is
+ * (no dice are rolled to score — scoring must be pure so the policy is
  * stable). Higher = better for the city.
  *
  *   - stat effects: added as-is, except chaos/pollution which are inverted
- *     (raising them is bad) and population which is scaled to stat-sized units;
+ *     (raising them is bad), magic which flips sign as the city nears the
+ *     singularity (see magicWeight), and population which is scaled to
+ *     stat-sized units;
  *   - faction effects: summed and weighted modestly;
  *   - chance outcomes: counted at their expected value (chance * effect), since
  *     over many runs that is what they contribute on average.
  *
  * The 'good' policy picks the highest score, 'bad' the lowest; ties break by
  * choice order (the caller relies on a stable scan, so equal scores keep their
- * original ordering).
+ * original ordering). Deterministic function of (choice, city stats).
  */
-export function scoreChoice(choice: EventChoice): number {
+export function scoreChoice(choice: EventChoice, city?: City): number {
+  const magicW = magicWeight(city);
   let score = 0;
-  score += scoreEffects(choice.effects);
+  score += scoreEffects(choice.effects, magicW);
 
   if (choice.factionEffects) {
     for (const delta of Object.values(choice.factionEffects)) {
@@ -75,7 +91,7 @@ export function scoreChoice(choice: EventChoice): number {
 
   // Chance follow-ups contribute their expected value.
   for (const outcome of choice.outcomes ?? []) {
-    if (outcome.effects) score += scoreEffects(outcome.effects) * outcome.chance;
+    if (outcome.effects) score += scoreEffects(outcome.effects, magicW) * outcome.chance;
     if (outcome.factionEffects) {
       for (const delta of Object.values(outcome.factionEffects)) {
         score += (delta as number) * FACTION_WEIGHT * outcome.chance;
@@ -86,11 +102,15 @@ export function scoreChoice(choice: EventChoice): number {
   return score;
 }
 
-function scoreEffects(effects: { [k: string]: number | undefined }): number {
+function scoreEffects(
+  effects: { [k: string]: number | undefined },
+  magicW: number,
+): number {
   let sum = 0;
   for (const [key, raw] of Object.entries(effects)) {
     const v = raw as number;
     if (key === 'population') sum += v * POPULATION_WEIGHT;
+    else if (key === 'magic') sum += v * magicW;
     else if (HIGH_IS_BAD.has(key)) sum -= v;
     else sum += v;
   }
@@ -100,13 +120,17 @@ function scoreEffects(effects: { [k: string]: number | undefined }): number {
 /**
  * Pick a choice per the policy. 'good' = highest score, 'bad' = lowest, with
  * deterministic tie-breaking by choice order (the first choice that achieves
- * the best/worst score wins). Pure function of the choices.
+ * the best/worst score wins). Deterministic in (choices, city stats).
  */
-export function pickChoice(choices: EventChoice[], policy: PlayPolicy): EventChoice {
+export function pickChoice(
+  choices: EventChoice[],
+  policy: PlayPolicy,
+  city?: City,
+): EventChoice {
   let best = choices[0];
-  let bestScore = scoreChoice(best);
+  let bestScore = scoreChoice(best, city);
   for (let i = 1; i < choices.length; i++) {
-    const score = scoreChoice(choices[i]);
+    const score = scoreChoice(choices[i], city);
     const better = policy === 'good' ? score > bestScore : score < bestScore;
     if (better) {
       best = choices[i];
@@ -150,7 +174,7 @@ export function runScriptedPlay(seed: string, days: number, policy: PlayPolicy):
     city = result.city;
 
     if (result.triggeredEvent) {
-      const choice = pickChoice(result.triggeredEvent.choices, policy);
+      const choice = pickChoice(result.triggeredEvent.choices, policy, city);
       city = applyEventChoice(city, result.triggeredEvent, choice.id).city;
       eventsAnswered += 1;
       // Answering can itself complete an outcome streak (e.g. a choice that

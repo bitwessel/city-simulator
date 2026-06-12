@@ -22,7 +22,9 @@ import { HEADLINE_POOL } from './data/headlines';
 import { checkOutcomes } from './outcomes';
 import { deriveCityMood } from './mood';
 import { maybeFoundDistrict } from './expansion';
+import { ageAtLeast, checkAgeUp, currentAge } from './ages';
 import { FAVOR_CAP, favorRegen, getFavor, getProjectDef } from '../projects/projects';
+import { applyWonderDrift, startWonder, tickWonder } from '../projects/wonders';
 import { applyFactionEffects, applyStatDelta } from '../events/system';
 
 // ---------------------------------------------------------------------------
@@ -66,6 +68,7 @@ export function simulateDay(
   regenFavor(city);
   applyQuirkDrift(city);
   applyProjectDrift(city);
+  applyWonderDrift(city);
   updateResources(city);
   updateCityStats(city, rng);
   updatePopulation(city, rng);
@@ -74,10 +77,18 @@ export function simulateDay(
   // the works finish. Runs after the daily drift so a freshly-completed
   // landmark's effects land on top of the day's baseline.
   tickConstruction(city, headlines);
+  // The wonder rises stage by stage on the same cadence (pure day arithmetic).
+  tickWonder(city, headlines);
   // City expansion: a thriving city may break ground on a new district. Uses a
   // dedicated deterministic sub-stream keyed off seed+day so it never perturbs
   // the main tick RNG sequence (and thus existing headline/event determinism).
   maybeFoundDistrict(city, dayRng(city, 'tick:found'), headlines);
+  // Ages: a deterministic milestone check after districts/expansion settle —
+  // the city may grow up a named age (Settlement → ... → Wonder Age). No RNG.
+  checkAgeUp(city, headlines);
+  // Entering (or idling unanswered in) the Wonder Age politely raises the
+  // council's great question: which wonder shall the city build?
+  maybeAskWonderCouncil(city);
   updateFactions(city);
   updateCitizenGroups(city);
   updateRisks(city, rng);
@@ -116,6 +127,12 @@ export function applyEventChoice(
   if (!choice) throw new Error(`Unknown choice '${choiceId}' for event '${event.defId}'`);
   const rng = new Rng(hashSeed(`${city.seed.raw}:choice:${city.day}:${choiceId}`));
   const { news } = applyChoiceToCity(city, event, choice, rng);
+  // Wonder-council choices carry the wonder to raise. Handled here (not in
+  // events/system) so the events module stays free of project imports;
+  // placement uses its own `:wonder:` sub-stream, so the order replays.
+  if (choice.startsWonderId) {
+    startWonder(city, choice.startsWonderId, news);
+  }
   city.news.push(...news);
   trimLog(city.news, 120);
   city.mood = deriveCityMood(city.stats);
@@ -205,6 +222,29 @@ function tickConstruction(city: City, headlines: NewsItem[]): void {
     });
   }
   city.activeProjects = stillBuilding;
+}
+
+/** The chain-only event the council uses to ask which wonder to raise. */
+export const WONDER_COUNCIL_EVENT_ID = 'wonder-council';
+/** If the council's question was waved away, it patiently asks again. */
+const WONDER_REASK_GAP_DAYS = 40;
+
+/**
+ * Queue the wonder-council question when the city sits in the Wonder Age with
+ * no wonder chosen. Fires the day after entering the age; if the memo lapses
+ * or is dismissed, the council re-asks every ~40 days (it can wait; it has
+ * biscuits). Deterministic — pure day arithmetic on replayable state.
+ */
+function maybeAskWonderCouncil(city: City): void {
+  if (currentAge(city) !== 'wonder') return;
+  if (city.activeWonder || city.completedWonder) return;
+  if (city.queuedEvents.some((q) => q.defId === WONDER_COUNCIL_EVENT_ID)) return;
+  if (city.wonderAskDay !== undefined && city.day - city.wonderAskDay < WONDER_REASK_GAP_DAYS) {
+    return;
+  }
+  const fireDay = city.day + 1;
+  city.queuedEvents.push({ defId: WONDER_COUNCIL_EVENT_ID, day: fireDay });
+  city.wonderAskDay = fireDay;
 }
 
 function updateResources(city: City): void {
@@ -578,7 +618,11 @@ function rollHeadline(
   headlines: NewsItem[],
 ): void {
   if (!rng.chance(0.4)) return;
-  const eligible = pool.filter((h) => conditionMet(h.condition, city));
+  const eligible = pool.filter(
+    (h) =>
+      conditionMet(h.condition, city) &&
+      (h.minAge === undefined || ageAtLeast(city, h.minAge)),
+  );
   if (eligible.length === 0) return;
   const headline = rng.weighted(eligible, (h) => h.weight);
   const district = city.districts.length > 0 ? rng.pick(city.districts) : null;

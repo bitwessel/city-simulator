@@ -13,6 +13,7 @@ import { Atmosphere } from './Atmosphere';
 import { Citizens } from './Citizens';
 import { Lanterns } from './Lanterns';
 import { ChimneySmoke } from './ChimneySmoke';
+import { Celebration } from './Celebration';
 import { DaylightRig } from './DaylightRig';
 import { terrainHeightAt } from '../generation/terrain';
 import { MOOD_THEMES } from './palette';
@@ -262,6 +263,7 @@ export function CityScene({ city, selectedDistrictId, onSelectDistrict, clockRat
       <Lanterns city={city} />
       <ChimneySmoke city={city} />
       <Citizens city={city} />
+      <Celebration city={city} center={center} extent={extent} />
       <OrbitControls
         enablePan
         enableDamping

@@ -117,7 +117,17 @@ export type BuildingKind =
   | 'hedge-maze'
   | 'hot-springs'
   | 'aviary'
-  | 'moondial';
+  | 'moondial'
+  // ----- Wonders (phase 04) -------------------------------------------------
+  // The Wonder Age mega-projects. Exactly one WonderDef per kind (see
+  // `src/projects/data/wonders.ts`); placed once per run via the wonder-council
+  // event, never by the roster generator or the regular projects system. They
+  // are the largest structures in the game and build in visible stages
+  // (`Building.wonderStage`).
+  | 'wonder-garden'
+  | 'wonder-academy'
+  | 'wonder-forge'
+  | 'wonder-festival';
 
 /** Building kinds that only exist as commissioned mayor-project landmarks. */
 export const LANDMARK_BUILDING_KINDS: BuildingKind[] = [
@@ -133,6 +143,14 @@ export const LANDMARK_BUILDING_KINDS: BuildingKind[] = [
   'hot-springs',
   'aviary',
   'moondial',
+];
+
+/** Building kinds that only exist as Wonder Age mega-projects. */
+export const WONDER_BUILDING_KINDS: BuildingKind[] = [
+  'wonder-garden',
+  'wonder-academy',
+  'wonder-forge',
+  'wonder-festival',
 ];
 
 export interface Building {
@@ -169,6 +187,30 @@ export interface Building {
    * `appearAt: 0` so the site is visible regardless of district development.
    */
   construction?: boolean;
+  /**
+   * Wonder construction stage (0-based), present only on the wonder building
+   * kinds. While `construction` is true the renderer draws the wonder at this
+   * stage (foundations → structure → crown); the engine bumps it as each
+   * stage's days elapse and clears `construction` when the final stage lands.
+   */
+  wonderStage?: number;
+}
+
+// ----- Ages (phase 04) -------------------------------------------------------
+
+/**
+ * The five named ages a city grows through, in order. Ages only ever advance —
+ * a city in decline simply stays in its age (and looks scruffier via mood).
+ */
+export type AgeId = 'settlement' | 'village' | 'town' | 'city' | 'wonder';
+
+/** The canonical age order, settlement first. */
+export const AGE_ORDER: AgeId[] = ['settlement', 'village', 'town', 'city', 'wonder'];
+
+/** One age-up record; the founding settlement (day 1) is implicit. */
+export interface AgeLogEntry {
+  age: AgeId;
+  day: number;
 }
 
 export type RiskKind =
@@ -364,6 +406,11 @@ export interface ProjectDef {
   factionEffects?: Partial<Record<FactionArchetype, number>>;
   /** Mood/wealth nudges to the host district on completion. */
   districtEffects?: { mood?: number; wealth?: number };
+  /**
+   * Earliest age this project can be commissioned in (phase 04). Undefined =
+   * available from the founding settlement onward.
+   */
+  minAge?: AgeId;
 }
 
 /**
@@ -389,6 +436,61 @@ export interface ActiveProject {
 
 /** A finished project — kept so headlines/events can reference the landmark. */
 export interface CompletedProject {
+  defId: string;
+  districtId: string;
+  day: number;
+}
+
+// ----- Wonders (phase 04) ------------------------------------------------------
+
+/** One visible construction stage of a wonder. */
+export interface WonderStage {
+  /** Short name for the groundbreaking/progress headlines ("the foundations"). */
+  name: string;
+  /** In-game days this stage takes. */
+  days: number;
+  /** Progress headline pushed the day this stage completes (tokens allowed). */
+  headline: string;
+}
+
+/**
+ * A Wonder Age mega-project — pure data like ProjectDef, but bigger: several
+ * construction stages over many days, one per run, chosen via the
+ * wonder-council event. Completing it is a triumphant ending. The catalog
+ * lives in `src/projects/data/wonders.ts`.
+ */
+export interface WonderDef {
+  id: string;
+  name: string;
+  /** Warm, slightly funny — match the event voice. */
+  flavor: string;
+  /** The wonder building kind placed in the world (one def per kind). */
+  building: BuildingKind;
+  /** District types the wonder prefers to rise in; 'any' allows all. */
+  districtTypes: DistrictType[] | 'any';
+  /** Ordered construction stages (3-4 of them, each many days). */
+  stages: WonderStage[];
+  /** One-shot stat effects when the final stage lands. */
+  completionEffects: StatDelta;
+  /** Ongoing daily drift while the finished wonder stands. */
+  dailyEffects?: StatDelta;
+}
+
+/** The city's wonder under construction (at most one per run). */
+export interface ActiveWonder {
+  defId: string;
+  districtId: string;
+  /** The staged `Building` already placed in the district. */
+  buildingId: string;
+  startDay: number;
+  /** Index of the stage currently being built. */
+  stage: number;
+  /** The day the current stage finishes. */
+  stageCompleteDay: number;
+}
+
+/** The finished wonder — its existence drives the triumphant wonder ending. */
+export interface CompletedWonder {
   defId: string;
   districtId: string;
   day: number;
@@ -441,6 +543,12 @@ export interface EventChoice {
   outcomes?: ChanceOutcome[];
   /** Immediately queue a chain event (fires in a few days). */
   unlocksEventId?: string;
+  /**
+   * Begin construction of this wonder (phase 04). Used by the wonder-council
+   * event's choices; placement derives from its own hashed sub-stream so the
+   * order replays identically.
+   */
+  startsWonderId?: string;
   /** One-line aftermath shown in the news feed (tokens allowed). */
   resultText: string;
 }
@@ -467,6 +575,8 @@ export interface GameEventDef {
   condition?: EventCondition;
   /** Earliest day this can fire randomly. */
   minDay?: number;
+  /** Earliest age this can fire randomly (phase 04; analogous to minDay). */
+  minAge?: AgeId;
   /** Fire at most once per run. */
   once?: boolean;
   /** Never picked randomly — only via queueEventId/unlocksEventId chains. */
@@ -502,6 +612,8 @@ export interface HeadlineTemplate {
   tone: NewsTone;
   weight: number;
   condition?: EventCondition;
+  /** Earliest age this headline can roll (phase 04). */
+  minAge?: AgeId;
 }
 
 // ----- Outcomes ----------------------------------------------------------------------
@@ -514,7 +626,8 @@ export type OutcomeKind =
   | 'magical-singularity'
   | 'pollution-wasteland'
   | 'revolution'
-  | 'wild-reclamation';
+  | 'wild-reclamation'
+  | 'wonder';
 
 export interface CityOutcome {
   kind: OutcomeKind;
@@ -599,6 +712,23 @@ export interface City {
   activeProjects?: ActiveProject[];
   /** Finished projects; headlines/events can reference these landmarks. */
   completedProjects?: CompletedProject[];
+  /**
+   * The city's current age (phase 04). Undefined = 'settlement' so older
+   * in-memory states load cleanly. Ages only advance, never regress; the
+   * daily tick checks milestones deterministically (`src/simulation/ages.ts`).
+   */
+  age?: AgeId;
+  /** Age-up records, oldest first (the founding settlement is implicit). */
+  ageLog?: AgeLogEntry[];
+  /**
+   * The day the wonder-council last asked which wonder to raise. Used to
+   * politely re-ask if the memo was waved away; deterministic, replayable.
+   */
+  wonderAskDay?: number;
+  /** The wonder under construction, if the council's question was answered. */
+  activeWonder?: ActiveWonder;
+  /** The finished wonder — drives the triumphant wonder ending. */
+  completedWonder?: CompletedWonder;
 }
 
 // ----- Engine results -----------------------------------------------------------------------

@@ -9,9 +9,10 @@ Feature work follows the phase specs in `prompts/` (build order and an index are
 
 ## Where the project is
 
-- **Phases 01–03 — shipped:** living-world graphics + day/night, relaxed balance, mayor projects.
-- **Phase 04 — current:** ages & progression. Spec: `prompts/04-ages-progression.md`.
-- **Phases 05–08 — not started:** edicts/founding, citizens/chronicle, worldsmith pipeline & session.
+- **Phases 01–04 — shipped:** living-world graphics + day/night, relaxed balance,
+  mayor projects, ages & progression (five ages, era skins, age bar, the wonder arc).
+- **Phase 05 — next:** edicts & founding. Spec: `prompts/05-edicts-and-founding.md`.
+- **Phases 06–08 — not started:** citizens/chronicle, worldsmith pipeline & session.
 
 The roadmap table in `00-vision.md` is the source of truth for build order and rationale.
 
@@ -56,6 +57,9 @@ Per-phase checks that have accreted (use the one matching what you touched):
 
 ```bash
 node scripts/project-check.mjs    # phase 03 mayor-projects end-to-end
+node scripts/age-check.mjs [seed] # phase 04: forces all five era skins + the wonder
+                                  #   stages (dev-only window.__mmDebug bridge) and
+                                  #   screenshots each — LOOK at them
 node scripts/daynight-check.mjs [seed]     # day/night-cycle screenshots
 node scripts/fps-probe.mjs [seed] [?nofx]  # headed FPS probe — headless = SwiftShader,
                                   #   ~1fps and useless; PostFX auto-degrades, sample

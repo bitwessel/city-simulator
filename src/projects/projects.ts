@@ -8,6 +8,7 @@ import type {
 import { Rng, hashSeed } from '../utils/rng';
 import { sampleBuildingPosition } from '../generation/generator';
 import { riverDistanceAt, terrainHeightAt, WATER_LEVEL } from '../generation/terrain';
+import { ageAtLeast, getAgeDef } from '../simulation/ages';
 import { PROJECT_POOL } from './data/projects';
 
 // ---------------------------------------------------------------------------
@@ -116,6 +117,12 @@ export function canStartProject(
   if (!projectAllowsDistrict(def, district)) {
     return { ok: false, reason: `Cannot be built in a ${district.type.replace('-', ' ')} district.` };
   }
+  if (def.minAge && !ageAtLeast(city, def.minAge)) {
+    return {
+      ok: false,
+      reason: `A dream for a grander age — arrives with ${getAgeDef(def.minAge).title}.`,
+    };
+  }
   if (districtHasProject(city, districtId, defId)) {
     return { ok: false, reason: `${district.name} already has this landmark.` };
   }
@@ -141,12 +148,6 @@ const LANDMARK_CLEARANCE_RADIUS = 3.4;
  * buildings (the sampler enforces the same min-gap as roster buildings), then
  * guarding against the river/water on top. The sub-stream is
  * `hash(seed + ':project:' + day + ':' + defId)` so an order replays identically.
- *
- * Returns the chosen position and a rotation. The disc is shrunk generously at
- * first (so landmarks stand clear of the edge) and relaxed over later rounds in
- * case the district is packed tight, keeping the dry candidate with the most
- * elbow room. Falls back to the district centre only if no dry sample exists
- * at all (a landmark always lands).
  */
 export function placeProject(
   city: City,
@@ -154,6 +155,24 @@ export function placeProject(
   def: ProjectDef,
 ): { position: { x: number; z: number }; rotation: number } {
   const rng = new Rng(hashSeed(`${city.seed.raw}:project:${city.day}:${def.id}`));
+  return placeLandmarkSite(city, district, rng);
+}
+
+/**
+ * The shared landmark placement loop, driven by a caller-provided rng stream
+ * (projects use `:project:`, wonders `:wonder:` — see the determinism rules).
+ *
+ * Returns the chosen position and a rotation. The disc is shrunk generously at
+ * first (so landmarks stand clear of the edge) and relaxed over later rounds in
+ * case the district is packed tight, keeping the dry candidate with the most
+ * elbow room. Falls back to the district centre only if no dry sample exists
+ * at all (a landmark always lands).
+ */
+export function placeLandmarkSite(
+  city: City,
+  district: District,
+  rng: Rng,
+): { position: { x: number; z: number }; rotation: number } {
   const terrain = city.terrain;
 
   const placed = district.buildings;

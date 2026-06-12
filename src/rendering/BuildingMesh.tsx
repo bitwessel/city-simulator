@@ -1,7 +1,7 @@
-import { useMemo, useRef, type ReactElement } from 'react';
+import { useEffect, useMemo, useRef, type ReactElement } from 'react';
 import { useFrame } from '@react-three/fiber';
 import type { Group } from 'three';
-import type { Building, BuildingKind } from '../types';
+import type { AgeId, Building, BuildingKind } from '../types';
 import {
   UNIT_BOX,
   UNIT_CONE,
@@ -42,6 +42,13 @@ export interface BuildingPalette {
   glow: string;
   /** Window/lamp emissive intensity for this mood (rises at dusk). */
   glowI: number;
+  /**
+   * The city's age (phase 04) — drives era dress: per-era geometry variants
+   * (settlement huts, town chimneys, wonder pennants). Colors arrive already
+   * era-blended via `applyEraToPalette`. Defaults to 'village' (≈ the
+   * pre-ages look) when a caller doesn't care.
+   */
+  era?: AgeId;
 }
 
 interface BuildingMeshProps {
@@ -256,6 +263,380 @@ function buildScaffold(building: Building, p: BuildingPalette) {
   );
 }
 
+// ----- Wonders (phase 04) ----------------------------------------------------
+// The Wonder Age mega-projects render in visible stages while under
+// construction (`building.wonderStage` 0..2: foundations → structure → crown)
+// and in full glory once complete. Each is the grandest silhouette in the
+// game, with a crane during the works (tagged `crane-arm` so the existing
+// construction animation swings it).
+
+const WONDER_KIND_SET = new Set<BuildingKind>([
+  'wonder-garden',
+  'wonder-academy',
+  'wonder-forge',
+  'wonder-festival',
+]);
+
+/** A construction crane + a couple of crates, shared by all wonder stages. */
+function wonderCrane(id: string, half: number, p: BuildingPalette) {
+  const timber = '#9c6b3f';
+  const timberDark = '#7c5230';
+  const mastH = 2.6 + hashFloat(id, 72) * 0.5;
+  const craneSign = hashFloat(id, 73) < 0.5 ? 1 : -1;
+  return (
+    <group position={[-half * 0.85, 0, -half * 0.85]}>
+      <mesh geometry={UNIT_BOX} position={[0, mastH / 2, 0]} scale={[0.16, mastH, 0.16]} castShadow>
+        <meshStandardMaterial color={timberDark} {...MAT} />
+      </mesh>
+      <group name="crane-arm" position={[0, mastH - 0.12, 0]} rotation={[0, craneSign * 0.5, 0]}>
+        <mesh geometry={UNIT_BOX} position={[half * 0.6, 0, 0]} scale={[half * 1.4, 0.1, 0.1]}>
+          <meshStandardMaterial color={timber} {...MAT} />
+        </mesh>
+        <mesh geometry={UNIT_BOX} position={[half * 1.1, -0.35, 0]} scale={[0.02, 0.7, 0.02]}>
+          <meshStandardMaterial color={'#3b3b3b'} {...MAT} />
+        </mesh>
+        <mesh geometry={UNIT_BOX} position={[half * 1.1, -0.78, 0]} scale={[0.3, 0.26, 0.3]}>
+          <meshStandardMaterial color={p.trim} {...MAT} />
+        </mesh>
+      </group>
+      <mesh geometry={UNIT_BOX} position={[0.5, 0.18, 0.3]} rotation={[0, hashFloat(id, 74) * 0.6, 0]} scale={[0.32, 0.32, 0.32]}>
+        <meshStandardMaterial color={'#b07a44'} {...MAT} />
+      </mesh>
+    </group>
+  );
+}
+
+/** The Great Garden: stacked green terraces crowned by one enormous tree. */
+function buildWonderGarden(id: string, stage: number, p: BuildingPalette) {
+  const earth = '#8a6f4a';
+  const grass = '#4f9d54';
+  const grassDark = '#3f8f48';
+  const terraces: [number, number][] = [
+    // [radius, top y]
+    [2.5, 0.5],
+    [1.85, 1.05],
+    [1.2, 1.6],
+  ];
+  const built = stage >= 1 ? terraces.length : 1;
+  const treeRing = (r: number, y: number, n: number, keyBase: number) =>
+    Array.from({ length: n }, (_, i) => {
+      const a = (i / n) * Math.PI * 2 + hashFloat(id, keyBase + i) * 0.4;
+      return (
+        <group key={`t-${keyBase}-${i}`} position={[Math.cos(a) * r, y, Math.sin(a) * r]}>
+          <mesh geometry={UNIT_CYLINDER} position={[0, 0.22, 0]} scale={[0.09, 0.45, 0.09]}>
+            <meshStandardMaterial color={'#6b4a2f'} {...MAT} />
+          </mesh>
+          <mesh geometry={UNIT_CONE_SMOOTH} position={[0, 0.65, 0]} scale={[0.42, 0.65, 0.42]}>
+            <meshStandardMaterial color={i % 2 === 0 ? grass : grassDark} {...MAT} />
+          </mesh>
+        </group>
+      );
+    });
+  return (
+    <group>
+      {/* retaining ring + terraces (bare earth until the plantings stage) */}
+      <mesh geometry={UNIT_CYLINDER_LOW} position={[0, 0.1, 0]} scale={[5.6, 0.2, 5.6]}>
+        <meshStandardMaterial color={p.trim} {...MAT} />
+      </mesh>
+      {terraces.slice(0, built).map(([r, y], i) => (
+        <group key={`terrace-${i}`}>
+          <mesh geometry={UNIT_CYLINDER} position={[0, y - 0.25, 0]} scale={[r, 0.5, r]} castShadow>
+            <meshStandardMaterial color={p.wall} {...MAT} />
+          </mesh>
+          <mesh geometry={UNIT_CYLINDER_LOW} position={[0, y, 0]} scale={[r * 1.96, 0.1, r * 1.96]}>
+            <meshStandardMaterial color={stage >= 1 ? grass : earth} {...MAT} />
+          </mesh>
+        </group>
+      ))}
+      {/* ring plantings from the second stage */}
+      {stage >= 2 && treeRing(2.1, 0.5, 9, 110)}
+      {stage >= 2 && treeRing(1.5, 1.05, 7, 130)}
+      {/* the crowning tree, complete with gently glowing blossoms */}
+      {stage >= 3 && (
+        <group position={[0, 1.6, 0]}>
+          <mesh geometry={UNIT_CYLINDER} position={[0, 0.55, 0]} scale={[0.28, 1.1, 0.28]} castShadow>
+            <meshStandardMaterial color={'#6b4a2f'} {...MAT} />
+          </mesh>
+          <mesh geometry={LOWPOLY_SPHERE} position={[0, 1.35, 0]} scale={[1.25, 1.05, 1.25]}>
+            <meshStandardMaterial color={grassDark} {...MAT} />
+          </mesh>
+          <mesh geometry={LOWPOLY_SPHERE} position={[0.4, 1.05, 0.3]} scale={[0.8, 0.7, 0.8]}>
+            <meshStandardMaterial color={grass} {...MAT} />
+          </mesh>
+          {[0, 1, 2, 3].map((i) => {
+            const a = (i / 4) * Math.PI * 2 + 0.5;
+            return (
+              <mesh
+                key={`blossom-${i}`}
+                geometry={UNIT_SPHERE}
+                position={[Math.cos(a) * 0.95, 1.3 + hashFloat(id, 150 + i) * 0.4, Math.sin(a) * 0.95]}
+                scale={[0.13, 0.13, 0.13]}
+              >
+                <meshStandardMaterial
+                  color={'#ffd9ec'}
+                  emissive={'#ff9ed2'}
+                  emissiveIntensity={0.8 + p.glowI}
+                  toneMapped={false}
+                  roughness={0.3}
+                />
+              </mesh>
+            );
+          })}
+        </group>
+      )}
+      {stage < 3 && wonderCrane(id, 2.4, p)}
+    </group>
+  );
+}
+
+/** The Grand Academy: a great dome over a colonnaded hall, four spires. */
+function buildWonderAcademy(id: string, stage: number, p: BuildingPalette) {
+  const bodyH = 1.5;
+  const halfW = 1.7;
+  const halfD = 1.3;
+  return (
+    <group>
+      {/* stepped base, dug deep enough to shelve three things */}
+      <mesh geometry={UNIT_BOX} position={[0, 0.14, 0]} scale={[halfW * 2.6, 0.28, halfD * 2.6]}>
+        <meshStandardMaterial color={p.trim} {...MAT} />
+      </mesh>
+      <mesh geometry={UNIT_BOX} position={[0, 0.36, 0]} scale={[halfW * 2.3, 0.2, halfD * 2.3]}>
+        <meshStandardMaterial color={p.wall} {...MAT} />
+      </mesh>
+      {/* the reading hall */}
+      {stage >= 1 && (
+        <group>
+          <mesh geometry={UNIT_BOX} position={[0, bodyH / 2 + 0.45, 0]} scale={[halfW * 2, bodyH, halfD * 2]} castShadow>
+            <meshStandardMaterial color={p.wall} {...MAT} />
+          </mesh>
+          {Array.from({ length: 7 }, (_, c) => {
+            const x = (c / 6 - 0.5) * halfW * 1.85;
+            return (
+              <mesh key={`col-${c}`} geometry={UNIT_CYLINDER} position={[x, bodyH * 0.5 + 0.45, halfD + 0.06]} scale={[0.14, bodyH, 0.14]}>
+                <meshStandardMaterial color={p.trim} {...MAT} />
+              </mesh>
+            );
+          })}
+          {/* window band, lit once the academy opens */}
+          <mesh geometry={UNIT_BOX} position={[0, bodyH * 0.62 + 0.45, halfD - 0.02]} scale={[halfW * 1.7, 0.34, 0.06]}>
+            <meshStandardMaterial
+              color={'#ffe8b8'}
+              emissive={'#ffce78'}
+              emissiveIntensity={stage >= 3 ? p.glowI * 0.9 : 0}
+              userData={stage >= 3 ? { glowDay: p.glowI * 0.9, glowNight: 2.3 } : undefined}
+              toneMapped={false}
+              {...MAT}
+            />
+          </mesh>
+        </group>
+      )}
+      {/* the great dome, audibly significant */}
+      {stage >= 2 && (
+        <group position={[0, bodyH + 0.45, 0]}>
+          <mesh geometry={UNIT_CYLINDER} position={[0, 0.18, 0]} scale={[1.35, 0.36, 1.35]}>
+            <meshStandardMaterial color={p.trim} {...MAT} />
+          </mesh>
+          <mesh geometry={UNIT_SPHERE} position={[0, 0.55, 0]} scale={[1.5, 1.15, 1.5]} castShadow>
+            <meshStandardMaterial color={p.accent} metalness={0.3} roughness={0.45} />
+          </mesh>
+          {stage >= 3 && (
+            <mesh geometry={UNIT_SPHERE} position={[0, 1.45, 0]} scale={[0.18, 0.22, 0.18]}>
+              <meshStandardMaterial color={p.glow} emissive={p.glow} emissiveIntensity={1.8 + p.glowI} toneMapped={false} roughness={0.3} />
+            </mesh>
+          )}
+        </group>
+      )}
+      {/* four spires, each capped by a scholar who insisted */}
+      {stage >= 3 &&
+        [
+          [halfW * 0.92, halfD * 0.92],
+          [-halfW * 0.92, halfD * 0.92],
+          [halfW * 0.92, -halfD * 0.92],
+          [-halfW * 0.92, -halfD * 0.92],
+        ].map(([sx, sz], i) => (
+          <group key={`spire-${i}`} position={[sx, 0.45, sz]}>
+            <mesh geometry={TOWER_BODY} position={[0, bodyH * 0.85, 0]} scale={[0.45, bodyH * 1.7, 0.45]} castShadow>
+              <meshStandardMaterial color={p.wall} {...MAT} />
+            </mesh>
+            <mesh geometry={UNIT_CONE_SMOOTH} position={[0, bodyH * 1.7 + 0.4, 0]} scale={[0.5, 0.8, 0.5]}>
+              <meshStandardMaterial color={p.accent} {...MAT} />
+            </mesh>
+          </group>
+        ))}
+      {stage < 3 && wonderCrane(id, 2.2, p)}
+    </group>
+  );
+}
+
+/** The Everforge: a great hall, a mighty chimney, and a fire that never dies. */
+function buildWonderForge(id: string, stage: number, p: BuildingPalette) {
+  const ember = '#ff7a36';
+  const halfW = 1.8;
+  const halfD = 1.25;
+  const bodyH = 1.4;
+  return (
+    <group>
+      {/* the great hearth pad + ceremonial anvil */}
+      <mesh geometry={UNIT_BOX} position={[0, 0.16, 0]} scale={[halfW * 2.5, 0.32, halfD * 2.5]}>
+        <meshStandardMaterial color={p.trim} {...MAT} />
+      </mesh>
+      <mesh geometry={UNIT_BOX} position={[halfW * 1.05, 0.5, halfD * 0.9]} scale={[0.5, 0.36, 0.3]}>
+        <meshStandardMaterial color={'#4a4a52'} metalness={0.5} roughness={0.4} />
+      </mesh>
+      {/* the hall with its barrel roof */}
+      {stage >= 1 && (
+        <group>
+          <mesh geometry={UNIT_BOX} position={[0, bodyH / 2 + 0.32, 0]} scale={[halfW * 2, bodyH, halfD * 2]} castShadow>
+            <meshStandardMaterial color={p.wall} {...MAT} />
+          </mesh>
+          <mesh geometry={UNIT_CYLINDER} position={[0, bodyH + 0.4, 0]} rotation={[0, 0, Math.PI / 2]} scale={[halfD * 1.05, halfW * 2.05, halfD * 1.05]}>
+            <meshStandardMaterial color={p.accent} {...MAT} />
+          </mesh>
+          {/* the forge mouth, glowing once lit */}
+          <mesh geometry={UNIT_BOX} position={[0, 0.62, halfD + 0.02]} scale={[0.9, 0.85, 0.1]}>
+            <meshStandardMaterial
+              color={stage >= 3 ? '#ffb36b' : '#2b2f3a'}
+              emissive={ember}
+              emissiveIntensity={stage >= 3 ? 1.2 + p.glowI : 0}
+              userData={stage >= 3 ? { glowDay: 1.2 + p.glowI, glowNight: 2.6 } : undefined}
+              toneMapped={false}
+              {...MAT}
+            />
+          </mesh>
+        </group>
+      )}
+      {/* the grand chimney */}
+      {stage >= 2 && (
+        <group position={[-halfW * 0.55, 0, -halfD * 0.4]}>
+          <mesh geometry={TOWER_BODY} position={[0, 1.9, 0]} scale={[0.85, 3.4, 0.85]} castShadow>
+            <meshStandardMaterial color={p.trim} {...MAT} />
+          </mesh>
+          {stage >= 3 && (
+            <mesh geometry={UNIT_CYLINDER_LOW} position={[0, 3.62, 0]} scale={[0.7, 0.18, 0.7]}>
+              <meshStandardMaterial color={ember} emissive={ember} emissiveIntensity={1.6 + p.glowI} toneMapped={false} roughness={0.4} />
+            </mesh>
+          )}
+        </group>
+      )}
+      {/* the great gear, turning forever (tagged for the animator) */}
+      {stage >= 3 && (
+        <group name="wonder-spin" position={[halfW + 0.35, bodyH * 0.75 + 0.3, 0]}>
+          <mesh geometry={UNIT_TORUS} scale={[1.5, 1.5, 1.8]}>
+            <meshStandardMaterial color={'#6a6a72'} metalness={0.55} roughness={0.4} />
+          </mesh>
+          {[0, 1, 2].map((i) => (
+            <mesh key={`spoke-${i}`} geometry={UNIT_BOX} rotation={[0, 0, (i * Math.PI) / 3]} scale={[1.0, 0.1, 0.08]}>
+              <meshStandardMaterial color={'#6a6a72'} metalness={0.55} roughness={0.4} />
+            </mesh>
+          ))}
+        </group>
+      )}
+      {stage < 3 && wonderCrane(id, 2.3, p)}
+    </group>
+  );
+}
+
+/** The Festival Eternal: a grand pavilion, a great wheel, a thousand lanterns. */
+function buildWonderFestival(id: string, stage: number, p: BuildingPalette) {
+  const poleR = 2.6;
+  return (
+    <group>
+      {/* festival grounds + ring of lantern poles, blessed individually */}
+      <mesh geometry={UNIT_CYLINDER_LOW} position={[0, 0.08, 0]} scale={[5.8, 0.16, 5.8]}>
+        <meshStandardMaterial color={'#c9a25e'} {...MAT} />
+      </mesh>
+      {Array.from({ length: 8 }, (_, i) => {
+        const a = (i / 8) * Math.PI * 2;
+        return (
+          <group key={`pole-${i}`} position={[Math.cos(a) * poleR, 0, Math.sin(a) * poleR]}>
+            <mesh geometry={UNIT_CYLINDER} position={[0, 0.55, 0]} scale={[0.07, 1.1, 0.07]}>
+              <meshStandardMaterial color={p.trim} {...MAT} />
+            </mesh>
+            <mesh geometry={UNIT_SPHERE} position={[0, 1.15, 0]} scale={[0.15, 0.17, 0.15]}>
+              <meshStandardMaterial
+                color={'#ffe6a8'}
+                emissive={'#ffcf6b'}
+                emissiveIntensity={stage >= 3 ? 0.8 + p.glowI : 0.1}
+                userData={stage >= 3 ? { glowDay: 0.8 + p.glowI, glowNight: 2.4 } : undefined}
+                toneMapped={false}
+              />
+            </mesh>
+          </group>
+        );
+      })}
+      {/* the grand striped pavilion */}
+      {stage >= 1 && (
+        <group position={[-1.1, 0, 0.4]}>
+          <mesh geometry={UNIT_CYLINDER} position={[0, 0.6, 0]} scale={[1.45, 1.2, 1.45]} castShadow>
+            <meshStandardMaterial color={p.wall} {...MAT} />
+          </mesh>
+          <mesh geometry={UNIT_CONE} position={[0, 1.7, 0]} rotation={[0, Math.PI / 6, 0]} scale={[2.2, 1.2, 2.2]}>
+            <meshStandardMaterial color={p.accent} {...MAT} />
+          </mesh>
+          <mesh geometry={UNIT_CONE} position={[0, 1.45, 0]} rotation={[0, Math.PI / 6, 0]} scale={[2.25, 0.6, 2.25]}>
+            <meshStandardMaterial color={p.wall} {...MAT} />
+          </mesh>
+          <mesh geometry={UNIT_SPHERE} position={[0, 2.4, 0]} scale={[0.12, 0.15, 0.12]}>
+            <meshStandardMaterial color={p.glow} emissive={p.glow} emissiveIntensity={stage >= 3 ? 1.4 + p.glowI : 0.2} toneMapped={false} roughness={0.3} />
+          </mesh>
+        </group>
+      )}
+      {/* the great wheel — static while it's assembled, turning once it opens */}
+      {stage >= 2 && (
+        <group position={[1.5, 0, -0.6]}>
+          {[-0.45, 0.45].map((sx) => (
+            <mesh key={`leg-${sx}`} geometry={UNIT_BOX} position={[sx * 0.7, 1.0, 0]} rotation={[0, 0, sx > 0 ? -0.32 : 0.32]} scale={[0.14, 2.1, 0.14]} castShadow>
+              <meshStandardMaterial color={p.trim} {...MAT} />
+            </mesh>
+          ))}
+          <group name={stage >= 3 ? 'wonder-spin' : 'wonder-wheel-static'} position={[0, 1.95, 0]}>
+            <mesh geometry={UNIT_TORUS} scale={[2.6, 2.6, 1.4]}>
+              <meshStandardMaterial color={p.accent} metalness={0.3} roughness={0.5} />
+            </mesh>
+            {[0, 1, 2, 3].map((i) => (
+              <mesh key={`wspoke-${i}`} geometry={UNIT_BOX} rotation={[0, 0, (i * Math.PI) / 4]} scale={[1.85, 0.07, 0.06]}>
+                <meshStandardMaterial color={p.trim} {...MAT} />
+              </mesh>
+            ))}
+            {Array.from({ length: 6 }, (_, i) => {
+              const a = (i / 6) * Math.PI * 2;
+              return (
+                <mesh key={`car-${i}`} geometry={UNIT_BOX} position={[Math.cos(a) * 0.95, Math.sin(a) * 0.95, 0]} scale={[0.22, 0.18, 0.18]}>
+                  <meshStandardMaterial
+                    color={i % 2 === 0 ? '#e87a7a' : '#7ab8e8'}
+                    emissive={i % 2 === 0 ? '#e87a7a' : '#7ab8e8'}
+                    emissiveIntensity={stage >= 3 ? 0.3 + p.glowI * 0.5 : 0}
+                    toneMapped={false}
+                    {...MAT}
+                  />
+                </mesh>
+              );
+            })}
+          </group>
+        </group>
+      )}
+      {stage < 3 && wonderCrane(id, 2.5, p)}
+    </group>
+  );
+}
+
+/** Dispatch a wonder kind to its staged builder. */
+function buildWonder(building: Building, p: BuildingPalette) {
+  // Stage 0..2 while under construction; 3 = standing complete.
+  const stage = building.construction ? (building.wonderStage ?? 0) : 3;
+  const id = building.id;
+  switch (building.kind) {
+    case 'wonder-garden':
+      return buildWonderGarden(id, stage, p);
+    case 'wonder-academy':
+      return buildWonderAcademy(id, stage, p);
+    case 'wonder-forge':
+      return buildWonderForge(id, stage, p);
+    default:
+      return buildWonderFestival(id, stage, p);
+  }
+}
+
 /**
  * Per-kind static sub-scene. Returned as JSX built from shared geometry +
  * inline materials. Tall kinds read `building.floors` for height. Per-building
@@ -265,8 +646,12 @@ function buildScaffold(building: Building, p: BuildingPalette) {
  * detailed silhouettes than roster buildings with a slight emissive accent so
  * they read as *special* at the default camera distance. While a landmark is a
  * construction site (`building.construction`), `buildScaffold` replaces it.
+ * Wonder kinds render their own staged silhouettes instead (phase 04).
  */
 function buildKind(building: Building, p: BuildingPalette) {
+  if (WONDER_KIND_SET.has(building.kind)) {
+    return buildWonder(building, p);
+  }
   if (building.construction) {
     return buildScaffold(building, p);
   }
@@ -279,17 +664,85 @@ function buildKind(building: Building, p: BuildingPalette) {
   const glowI = p.glowI;
   const id = building.id;
   const floors = building.floors ?? 4;
+  const era = p.era ?? 'village';
 
   switch (kind) {
-    case 'house':
+    case 'house': {
+      // The most common kind carries the era story hardest (phase 04):
+      // settlement = round thatch hut, village = the classic timber cottage,
+      // town/city = + chimney (city houses also grow a storey), wonder = + a
+      // little pennant. Palette already arrives era-blended.
+      if (era === 'settlement') {
+        return (
+          <group>
+            <mesh geometry={UNIT_CYLINDER} position={[0, 0.3, 0]} scale={[0.95, 0.6, 0.95]} castShadow>
+              <meshStandardMaterial color={wall} {...MAT} />
+            </mesh>
+            {/* big straw cap reaching almost to the ground */}
+            <mesh geometry={UNIT_CONE_SMOOTH} position={[0, 0.95, 0]} scale={[1.5, 0.95, 1.5]}>
+              <meshStandardMaterial color={accent} {...MAT} />
+            </mesh>
+            {/* door flap + a firepit glow by the entrance */}
+            <mesh geometry={UNIT_BOX} position={[0, 0.22, 0.48]} scale={[0.22, 0.38, 0.1]}>
+              <meshStandardMaterial color={trim} {...MAT} />
+            </mesh>
+            <mesh geometry={UNIT_SPHERE} position={[0.55, 0.08, 0.55]} scale={[0.14, 0.08, 0.14]}>
+              <meshStandardMaterial
+                color={'#ffb45e'}
+                emissive={'#ff8a3c'}
+                emissiveIntensity={0.4 + glowI * 0.5}
+                userData={{ glowDay: 0.4 + glowI * 0.5, glowNight: 1.8 }}
+                toneMapped={false}
+                {...MAT}
+              />
+            </mesh>
+          </group>
+        );
+      }
+      const grand = era === 'city' || era === 'wonder';
+      const bodyH = grand ? 1.25 : 0.9;
       return (
         <group>
-          <mesh geometry={UNIT_BOX} position={[0, 0.45, 0]} scale={[1.1, 0.9, 1]} castShadow>
+          <mesh geometry={UNIT_BOX} position={[0, bodyH / 2, 0]} scale={[1.1, bodyH, 1]} castShadow>
             <meshStandardMaterial color={wall} {...MAT} />
           </mesh>
-          <mesh geometry={UNIT_CONE} position={[0, 1.15, 0]} rotation={[0, Math.PI / 6, 0]} scale={[1.5, 0.7, 1.35]}>
+          {/* a trim string-course where the second storey starts, for grandeur */}
+          {grand && (
+            <mesh geometry={UNIT_BOX} position={[0, 0.62, 0]} scale={[1.16, 0.07, 1.06]}>
+              <meshStandardMaterial color={trim} {...MAT} />
+            </mesh>
+          )}
+          <mesh
+            geometry={UNIT_CONE}
+            position={[0, bodyH + 0.25, 0]}
+            rotation={[0, Math.PI / 6, 0]}
+            scale={[1.5, 0.7, 1.35]}
+          >
             <meshStandardMaterial color={accent} {...MAT} />
           </mesh>
+          {/* chimneys arrive with the Town age */}
+          {(era === 'town' || grand) && (
+            <mesh geometry={UNIT_BOX} position={[0.42, bodyH + 0.42, -0.2]} scale={[0.16, 0.55, 0.16]}>
+              <meshStandardMaterial color={trim} {...MAT} />
+            </mesh>
+          )}
+          {/* the Wonder Age flies its colors */}
+          {era === 'wonder' && (
+            <group position={[0, bodyH + 0.55, 0]}>
+              <mesh geometry={UNIT_CYLINDER} position={[0, 0.2, 0]} scale={[0.04, 0.45, 0.04]}>
+                <meshStandardMaterial color={trim} {...MAT} />
+              </mesh>
+              <mesh geometry={UNIT_BOX} position={[0.13, 0.34, 0]} scale={[0.24, 0.13, 0.02]}>
+                <meshStandardMaterial
+                  color={glow}
+                  emissive={glow}
+                  emissiveIntensity={0.4 + glowI * 0.5}
+                  toneMapped={false}
+                  {...MAT}
+                />
+              </mesh>
+            </group>
+          )}
           <mesh geometry={UNIT_BOX} position={[0, 0.25, 0.52]} scale={[0.22, 0.4, 0.1]}>
             <meshStandardMaterial color={trim} {...MAT} />
           </mesh>
@@ -306,6 +759,7 @@ function buildKind(building: Building, p: BuildingPalette) {
           </mesh>
         </group>
       );
+    }
 
     case 'tower':
       return (
@@ -319,6 +773,23 @@ function buildKind(building: Building, p: BuildingPalette) {
           <mesh geometry={UNIT_CONE} position={[0, 2.25, 0]} scale={[1.05, 0.85, 1.05]}>
             <meshStandardMaterial color={accent} {...MAT} />
           </mesh>
+          {/* Wonder Age banners on the watchtowers */}
+          {era === 'wonder' && (
+            <group position={[0, 2.65, 0]}>
+              <mesh geometry={UNIT_CYLINDER} position={[0, 0.25, 0]} scale={[0.04, 0.55, 0.04]}>
+                <meshStandardMaterial color={trim} {...MAT} />
+              </mesh>
+              <mesh geometry={UNIT_BOX} position={[0.15, 0.42, 0]} scale={[0.28, 0.15, 0.02]}>
+                <meshStandardMaterial
+                  color={glow}
+                  emissive={glow}
+                  emissiveIntensity={0.4 + glowI * 0.5}
+                  toneMapped={false}
+                  {...MAT}
+                />
+              </mesh>
+            </group>
+          )}
         </group>
       );
 
@@ -1614,6 +2085,9 @@ const ANIMATED_KINDS = new Set<BuildingKind>([
   'fountain-plaza', // shimmering water disc (reuses the `fountain-water` tag)
   'bell-tower', // the belfry bell sways
   'moondial', // the dial face drifts very slowly
+  // Wonders with a turning centerpiece (the `wonder-spin` tag).
+  'wonder-forge', // the great gear
+  'wonder-festival', // the great wheel
 ]);
 
 /**
@@ -1634,7 +2108,7 @@ function varyPalette(building: Building, base: BuildingPalette): BuildingPalette
       ? shiftHSL(base.accent, (hashFloat(id, 55) - 0.5) * 0.12, 0.06, 0.04)
       : shiftHSL(base.accent, dh * 0.5, ds * 0.4, dl * 0.4);
   const trim = shiftHSL(base.trim, dh, ds * 0.5, dl * 0.6);
-  return { wall, accent, trim, glow: base.glow, glowI: base.glowI };
+  return { wall, accent, trim, glow: base.glow, glowI: base.glowI, era: base.era };
 }
 
 export function BuildingMesh({ building, palette, wobble = false, facing }: BuildingMeshProps) {
@@ -1647,17 +2121,19 @@ export function BuildingMesh({ building, palette, wobble = false, facing }: Buil
   const bellRef = useRef<Group | null>(null);
   const dialRef = useRef<Group | null>(null);
   const craneRef = useRef<Group | null>(null);
+  const spinRef = useRef<Group | null>(null);
 
   // Per-building varied palette (keyed on id + the base palette strings).
   const vp = useMemo(
     () => varyPalette(building, palette),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [building.id, palette.wall, palette.accent, palette.trim, palette.glow, palette.glowI],
+    [building.id, palette.wall, palette.accent, palette.trim, palette.glow, palette.glowI, palette.era],
   );
 
   // Memoize the static sub-scene per kind + varied palette. `construction` is a
   // dependency so the mesh swaps from scaffolding to the finished landmark on
-  // the day the project completes (same id/kind, only the flag clears).
+  // the day the project completes (same id/kind, only the flag clears);
+  // `wonderStage` and `era` likewise re-dress wonders and era geometry.
   const content = useMemo(
     () => buildKind(building, vp),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1666,11 +2142,13 @@ export function BuildingMesh({ building, palette, wobble = false, facing }: Buil
       building.kind,
       building.floors,
       building.construction,
+      building.wonderStage,
       vp.wall,
       vp.accent,
       vp.trim,
       vp.glow,
       vp.glowI,
+      vp.era,
     ],
   );
 
@@ -1685,6 +2163,17 @@ export function BuildingMesh({ building, palette, wobble = false, facing }: Buil
   // overshoot. Runs once per mount (i.e. when the building first appears).
   const spawnStart = useRef<number | null>(null);
   const spawnDone = useRef(false);
+
+  // Age-up re-dress: when the era changes after mount, replay the pop so the
+  // whole city "poofs" into its new dress — charming rather than jarring.
+  const eraRef = useRef(vp.era);
+  useEffect(() => {
+    if (eraRef.current !== vp.era) {
+      eraRef.current = vp.era;
+      spawnDone.current = false;
+      spawnStart.current = null;
+    }
+  }, [vp.era]);
 
   useFrame((state) => {
     const t = state.clock.elapsedTime;
@@ -1727,6 +2216,14 @@ export function BuildingMesh({ building, palette, wobble = false, facing }: Buil
     if (building.kind === 'moondial' && groupRef.current && dialRef.current === null) {
       dialRef.current = (groupRef.current.getObjectByName('moondial-face') as Group) ?? null;
     }
+    if (
+      (building.kind === 'wonder-forge' || building.kind === 'wonder-festival') &&
+      !building.construction &&
+      groupRef.current &&
+      spinRef.current === null
+    ) {
+      spinRef.current = (groupRef.current.getObjectByName('wonder-spin') as Group) ?? null;
+    }
     if (building.construction && groupRef.current && craneRef.current === null) {
       craneRef.current = (groupRef.current.getObjectByName('crane-arm') as Group) ?? null;
     }
@@ -1753,6 +2250,10 @@ export function BuildingMesh({ building, palette, wobble = false, facing }: Buil
       // The dial face drifts very slowly, like a sundial tracking time. The
       // base tilt is baked into the group's rotation.x, so we only spin Y.
       dialRef.current.rotation.y = t * 0.05 + phase;
+    }
+    if (spinRef.current) {
+      // The wonder's centerpiece (great gear / great wheel) turns lazily.
+      spinRef.current.rotation.z = t * 0.25 + phase;
     }
     if (craneRef.current) {
       // The crane arm swings the suspended block lazily back and forth.

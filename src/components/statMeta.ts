@@ -194,4 +194,5 @@ export const OUTCOME_KIND_ICON: Record<OutcomeKind, string> = {
   'pollution-wasteland': '☠️',
   revolution: '⚔️',
   'wild-reclamation': '🌿',
+  wonder: '🏯',
 };

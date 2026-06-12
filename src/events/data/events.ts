@@ -2305,4 +2305,214 @@ export const EVENT_POOL: GameEventDef[] = [
       },
     ],
   },
+
+  // -------------------------------------------------------------------------
+  // AGE EVENTS (phase 04) — unlocked as the city grows up. Each age brings its
+  // own brand of trouble: a village's first proper tavern brawl, a town's
+  // charter pedantry, a city's bureaucracy achieving sentience. Plus the
+  // wonder-council question itself (chain-only; queued by the engine the day
+  // after the city enters the Wonder Age).
+  // -------------------------------------------------------------------------
+  {
+    id: 'village-tavern-brawl',
+    title: 'The Village’s First Proper Tavern Brawl',
+    description:
+      'It finally happened: a disagreement at the tavern in {district} about whose grandmother makes the better stew escalated into what witnesses proudly call "a real one, like in the songs". Two chairs are casualties. Everyone is weirdly delighted.',
+    tags: ['culture', 'weird'],
+    weight: 10,
+    minAge: 'village',
+    once: true,
+    choices: [
+      {
+        id: 'mediate-stew',
+        label: 'Settle it with a public stew tasting',
+        description: 'Both grandmothers. One podium. No survivors among the doubters.',
+        effects: { happiness: 5, culture: 4, wealth: -2 },
+        factionEffects: { 'street-performers': 6 },
+        resultText:
+          'The tasting ends in a diplomatic tie and one new annual holiday. Both grandmothers are insufferable now, as is right.',
+      },
+      {
+        id: 'fine-them',
+        label: 'Fine everyone involved a chair',
+        description: 'The tavern needs chairs. Justice can be practical.',
+        effects: { safety: 3, trust: 2, happiness: -2 },
+        resultText:
+          'The tavern now has a "Brawl Corner" furnished entirely with confiscated chairs. It is the most popular corner.',
+      },
+      {
+        id: 'commemorate',
+        label: 'Commission a small plaque',
+        description: 'Every village needs founding legends. This one has stew.',
+        effects: { culture: 5, chaos: 2 },
+        factionEffects: { archivists: 5 },
+        resultText:
+          'The plaque reads "On this spot, opinions were exchanged." Visitors photograph it daily.',
+      },
+    ],
+  },
+  {
+    id: 'town-charter-dispute',
+    title: 'The Town Charter Dispute',
+    description:
+      'Now that {city} is officially a Town, somebody actually read the new charter. Clause 12 names an "Official Town Bird" but the space after it is blank, and three factions have arrived with candidates. One of the candidates is, technically, a bat.',
+    tags: ['faction', 'culture', 'weird'],
+    weight: 10,
+    minAge: 'town',
+    once: true,
+    choices: [
+      {
+        id: 'public-vote',
+        label: 'Put it to a public vote',
+        description: 'Democracy, but with feathers.',
+        effects: { trust: 5, culture: 3, chaos: 2 },
+        resultText:
+          'After a spirited campaign season, the bat wins by a wing. The charter is amended to say "Bird (honorary)".',
+      },
+      {
+        id: 'council-decides',
+        label: 'Let the council pick something neutral',
+        description: 'The pigeon is right there. It already acts elected.',
+        effects: { trust: 2, infrastructure: 2, happiness: -2 },
+        resultText:
+          'The council selects the pigeon. The pigeon accepts the honor by stealing a sandwich at the ceremony.',
+      },
+      {
+        id: 'leave-blank',
+        label: 'Declare the blank space a tradition',
+        description: 'Every town needs a mystery. Ours is ornithological.',
+        effects: { culture: 4, magic: 2 },
+        factionEffects: { archivists: 6 },
+        resultText:
+          'Clause 12 now officially reads "______ (beloved)". Scholars call it the most honest law ever written.',
+      },
+    ],
+  },
+  {
+    id: 'city-bureaucracy',
+    title: 'The Department of Departments',
+    description:
+      'With cityhood came paperwork, and with paperwork came the Department of Departments — founded to coordinate the other departments, which immediately required a Sub-Department of Coordination. They have requested a bigger office, in triplicate, with a form for requesting forms.',
+    tags: ['economy', 'weird', 'infrastructure'],
+    weight: 10,
+    minAge: 'city',
+    once: true,
+    choices: [
+      {
+        id: 'streamline',
+        label: 'Streamline the whole thing ruthlessly',
+        description: 'One form. ONE.',
+        effects: { infrastructure: 5, trust: 4, wealth: -3 },
+        factionEffects: { engineers: 6, merchants: 5 },
+        resultText:
+          'The Great Simplification takes a week and produces one form, which fits on a card. Clerks weep with what is probably relief.',
+      },
+      {
+        id: 'embrace-it',
+        label: 'Fund it — order has its charms',
+        description: 'Stamps for everyone. The good brass ones.',
+        effects: { infrastructure: 3, chaos: -4, happiness: -2, wealth: -3 },
+        factionEffects: { archivists: 8 },
+        resultText:
+          'The Department flourishes. Everything in {city} is now filed, including, somehow, the weather.',
+      },
+      {
+        id: 'goblin-audit',
+        label: 'Hire goblins to audit it',
+        description: 'They find every loophole. Usually by living in it.',
+        effects: { wealth: 4, chaos: 3, trust: 2 },
+        factionEffects: { 'goblin-union': 10, archivists: -5 },
+        resultText:
+          'The goblin auditors recover a fortune in lost fees and one intern who had been filed under "Misc" since spring.',
+      },
+    ],
+  },
+  {
+    id: 'wonder-pilgrim-influx',
+    title: 'Pilgrims of the Wonder Age',
+    description:
+      'Word has spread that {city} has entered a Wonder Age, and travelers are arriving to see it with their own eyes — scholars, painters, one suspiciously well-dressed dragon enthusiast. The inns are full and the bakers are running drills.',
+    tags: ['economy', 'culture'],
+    weight: 9,
+    minAge: 'wonder',
+    choices: [
+      {
+        id: 'welcome-all',
+        label: 'Throw the gates wide',
+        description: 'A great city greets the world.',
+        effects: { wealth: 5, culture: 4, housing: -3, chaos: 2 },
+        factionEffects: { merchants: 8, 'street-performers': 6 },
+        resultText:
+          'The pilgrims spend generously and applaud everything, including a door. {city} has never felt so admired.',
+      },
+      {
+        id: 'guided-tours',
+        label: 'Organize official guided tours',
+        description: 'Orderly wonder. Ticketed awe.',
+        effects: { wealth: 3, trust: 3, culture: 2 },
+        factionEffects: { archivists: 5 },
+        resultText:
+          'The tours run like clockwork. The guides’ script describes the city as "humble", which gets a laugh every time.',
+      },
+      {
+        id: 'quiet-season',
+        label: 'Politely cap the crowds for now',
+        description: 'The city is for the citizens first.',
+        effects: { happiness: 3, housing: 2, wealth: -2 },
+        resultText:
+          'A waiting list is established. Being on it becomes, instantly, fashionable.',
+      },
+    ],
+  },
+  {
+    id: 'wonder-council',
+    title: 'The Council Asks: What Wonder Shall We Raise?',
+    description:
+      'The council chamber is packed to the rafters. {city} has entered its Wonder Age, and the question on the table is the biggest one a city ever asks: what shall we build that outlives us all? Four proposals lie on the table, each with its own delegation holding its breath.',
+    tags: ['wonder', 'culture'],
+    weight: 0,
+    chainOnly: true,
+    choices: [
+      {
+        id: 'choose-garden',
+        label: 'Raise the Great Garden',
+        description: 'Terraces of green stacked to the sky — a living monument.',
+        effects: { beauty: 3, happiness: 2 },
+        factionEffects: { gardeners: 12 },
+        startsWonderId: 'great-garden',
+        resultText:
+          'The gardeners’ delegation faints in relays. The Great Garden will rise — terrace by terrace, root by root.',
+      },
+      {
+        id: 'choose-academy',
+        label: 'Raise the Grand Academy',
+        description: 'A dome of learning visible from three districts away.',
+        effects: { culture: 3, magic: 2 },
+        factionEffects: { archivists: 10, mages: 8 },
+        startsWonderId: 'grand-academy',
+        resultText:
+          'The scholars immediately begin arguing about the library’s sorting system. The Grand Academy will rise.',
+      },
+      {
+        id: 'choose-everforge',
+        label: 'Raise the Everforge',
+        description: 'A fire that never goes out, and a city that never stops making.',
+        effects: { infrastructure: 3, wealth: 2 },
+        factionEffects: { engineers: 12, workers: 8 },
+        startsWonderId: 'everforge',
+        resultText:
+          'The engineers unroll blueprints longer than the council table. The Everforge will rise, and then it will never stop.',
+      },
+      {
+        id: 'choose-festival',
+        label: 'Raise the Festival Eternal',
+        description: 'A celebration with no closing ceremony. Ever.',
+        effects: { happiness: 3, culture: 2 },
+        factionEffects: { 'street-performers': 12, merchants: 6 },
+        startsWonderId: 'festival-eternal',
+        resultText:
+          'The street performers begin rehearsing on the spot. The Festival Eternal will rise — and it will never, ever end.',
+      },
+    ],
+  },
 ];

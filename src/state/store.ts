@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import type { ActiveEvent, City } from '../types';
+import type { ActiveEvent, ActiveWonder, AgeId, City, CompletedWonder } from '../types';
+import { AGE_ORDER } from '../types';
 import { generateCity, randomSeedString } from '../generation/generator';
 import {
   EVENT_RESPONSE_WINDOW_DAYS,
@@ -169,3 +170,62 @@ export const useGameStore = create<GameStore>((set, get) => ({
       speed: 2,
     }),
 }));
+
+// Dev-only debug bridge for scripts/age-check.mjs and manual era previews:
+// forces the running city into an age (or a wonder into a construction stage)
+// so each era skin / wonder silhouette can be screenshotted without simulating
+// hundreds of days. Never part of a real run (the sim's own age-ups flow
+// through simulateDay); stripped from production builds.
+if (import.meta.env.DEV && typeof window !== 'undefined') {
+  (window as unknown as { __mmDebug?: object }).__mmDebug = {
+    forceAge: (age: AgeId) => {
+      if (!AGE_ORDER.includes(age)) return;
+      const { city } = useGameStore.getState();
+      if (!city) return;
+      const next = structuredClone(city);
+      next.age = age;
+      next.ageLog = [...(next.ageLog ?? []), { age, day: next.day }];
+      useGameStore.setState({ city: next });
+    },
+    /** Place (or restage) a wonder; stage >= stage count = complete. */
+    forceWonder: async (defId: string, stage: number) => {
+      const { startWonder, getWonderDef } = await import('../projects/wonders');
+      const { city } = useGameStore.getState();
+      const def = getWonderDef(defId);
+      if (!city || !def) return;
+      const next = structuredClone(city);
+      // Clear any previously forced wonder so each can be previewed in turn.
+      for (const d of next.districts) {
+        d.buildings = d.buildings.filter((b) => !b.id.startsWith('wonder-'));
+      }
+      next.activeWonder = undefined;
+      next.completedWonder = undefined;
+      const active = startWonder(next, defId, next.news);
+      if (active && active.defId === defId) {
+        const district = next.districts.find((d) => d.id === active.districtId);
+        const building = district?.buildings.find((b) => b.id === active.buildingId);
+        if (building) {
+          if (stage >= def.stages.length) {
+            building.construction = false;
+            building.wonderStage = def.stages.length;
+            next.completedWonder = {
+              defId,
+              districtId: active.districtId,
+              day: next.day,
+            };
+            next.activeWonder = undefined;
+          } else {
+            building.wonderStage = stage;
+            active.stage = stage;
+          }
+        }
+      }
+      useGameStore.setState({ city: next });
+      // The host district's center, so scripts can aim the camera at it.
+      const placed: CompletedWonder | ActiveWonder | undefined =
+        next.completedWonder ?? next.activeWonder;
+      const host = next.districts.find((d) => d.id === placed?.districtId);
+      return host ? { x: host.position.x, z: host.position.z } : undefined;
+    },
+  };
+}

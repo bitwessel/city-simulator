@@ -109,6 +109,10 @@ export const CATASTROPHIC_OUTCOMES: ReadonlySet<OutcomeKind> = new Set<OutcomeKi
 export const TRIUMPHANT_OUTCOMES: ReadonlySet<OutcomeKind> = new Set<OutcomeKind>([
   'utopia',
   'golden-age',
+  // Phase 04: completing a wonder. Safe for the hands-off contract — the
+  // wonder only exists if the player answers the wonder-council memo, which a
+  // hands-off run never does.
+  'wonder',
 ]);
 
 export function isCatastrophic(kind: OutcomeKind | undefined | null): boolean {

@@ -115,6 +115,9 @@ describe('simulation engine', () => {
     expect(runA.eventLog).toEqual(runB.eventLog);
     expect(runA.news).toEqual(runB.news);
     expect(runA.outcome?.kind).toBe(runB.outcome?.kind);
+    // Phase 04: the age history is part of the replayed state too.
+    expect(runA.age).toBe(runB.age);
+    expect(runA.ageLog).toEqual(runB.ageLog);
   });
 
   it('different seeds diverge over time', () => {

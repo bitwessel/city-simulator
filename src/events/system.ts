@@ -12,6 +12,7 @@ import type {
 } from '../types';
 import type { Rng } from '../utils/rng';
 import { clampStat } from '../utils/math';
+import { ageAtLeast } from '../simulation/ages';
 
 // Event mechanics: condition checks, weighted selection, token resolution and
 // applying choice consequences. Event *content* lives in src/events/data.
@@ -52,6 +53,7 @@ export function eventIsEligible(def: GameEventDef, city: City): boolean {
   if (def.chainOnly) return false;
   if (def.once && city.firedEventIds.includes(def.id)) return false;
   if (def.minDay !== undefined && city.day < def.minDay) return false;
+  if (def.minAge !== undefined && !ageAtLeast(city, def.minAge)) return false;
   if (def.involvedFaction && !city.factions.some((f) => f.archetype === def.involvedFaction)) {
     return false;
   }

@@ -354,4 +354,62 @@ export const HEADLINE_POOL: HeadlineTemplate[] = [
     weight: 6,
     condition: { requiresCompletedProjectId: 'great-moondial' },
   },
+
+  // ----- Age-flavored headlines (phase 04) -------------------------------------
+  // Gated on the city's age so the feed grows up with the skyline: village
+  // pride, town bustle, city sophistication, wonder-age awe.
+  {
+    text: 'A traveling merchant calls {city} "a proper village now"; the compliment is framed and hung in the tavern.',
+    tone: 'good',
+    weight: 8,
+    minAge: 'village',
+  },
+  {
+    text: 'The new timber houses of {district} smell so pleasantly of cedar that walking tours have formed unprompted.',
+    tone: 'good',
+    weight: 7,
+    minAge: 'village',
+  },
+  {
+    text: 'Town status has gone to the pigeons of {city}; witnesses report they now queue for fountains.',
+    tone: 'weird',
+    weight: 7,
+    minAge: 'town',
+  },
+  {
+    text: 'The stonemasons of {district} have run out of things to pave and are eyeing the river speculatively.',
+    tone: 'neutral',
+    weight: 7,
+    minAge: 'town',
+  },
+  {
+    text: '{city} now has rush hour. Opinions are divided on whether this counts as progress, but everyone is in the queue to discuss it.',
+    tone: 'neutral',
+    weight: 7,
+    minAge: 'city',
+  },
+  {
+    text: 'A visiting dignitary calls {city} "a true city at last", then gets lost for five hours. The council takes both as compliments.',
+    tone: 'good',
+    weight: 7,
+    minAge: 'city',
+  },
+  {
+    text: 'Lantern-lighters of {district} unionize, citing "more lanterns than stars these days". Demands include taller ladders and shorter poems.',
+    tone: 'weird',
+    weight: 6,
+    minAge: 'city',
+  },
+  {
+    text: 'Cartographers redraw the regional map with {city} in larger letters. The neighboring towns pretend not to notice.',
+    tone: 'good',
+    weight: 7,
+    minAge: 'wonder',
+  },
+  {
+    text: 'A bard arrives in {city} to write the definitive ballad of the Wonder Age, and is immediately scooped by three local children with a drum.',
+    tone: 'weird',
+    weight: 6,
+    minAge: 'wonder',
+  },
 ];

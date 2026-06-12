@@ -5,6 +5,8 @@ import { TopBar } from './TopBar';
 import { LeftPanel } from './LeftPanel';
 import { NewsFeed } from './NewsFeed';
 import { ControlBar } from './ControlBar';
+import { AgeBar } from './AgeBar';
+import { AgeBanner } from './AgeBanner';
 import { EventModal } from './EventModal';
 import { EventNotification } from './EventNotification';
 import { OutcomeOverlay } from './OutcomeOverlay';
@@ -40,8 +42,15 @@ export function GameScreen({ city }: { city: City }) {
       <div className="game__overlay">
         <TopBar city={city} />
         <LeftPanel city={city} />
-        <ControlBar />
+        {/* Bottom stack: the age progression strip rides above the controls. */}
+        <div className="bottombar">
+          <AgeBar city={city} />
+          <ControlBar />
+        </div>
       </div>
+
+      {/* A short celebratory toast when the city grows up an age. */}
+      <AgeBanner city={city} />
 
       {/* News surfaces as a self-positioning fading ticker + chronicle drawer. */}
       <NewsFeed city={city} />

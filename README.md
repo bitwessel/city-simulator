@@ -39,6 +39,9 @@ If you rename the repository, update the Vite base path to match the new repo na
 3. Watch the days roll by. Use the speed controls, or pause and step day by day. Your
    city starts as a young settlement: districts construct new buildings as their
    development climbs, and citizens stroll the plazas and walk the roads between them.
+   As it flourishes it grows up through named ages — Settlement, Village, Town, City,
+   and at last the Wonder Age — re-dressing the whole skyline at each step (watch the
+   age bar at the bottom of the screen).
 4. Every minute or so a **council memo** arrives as a notification — the game keeps
    running. Click it to read and pick a response (every option has trade-offs; the
    effect chips show the immediate stat impact, but chance outcomes and follow-up
@@ -60,16 +63,21 @@ src/
   utils/        Seeded RNG (xmur3 + mulberry32), math helpers
   generation/   Procedural city generator + name/faction/quirk data
   simulation/   The day-tick engine: stat spirals, risks, disasters, headlines,
-                outcome detection, visual mood derivation
+                ages & milestones, outcome detection, visual mood derivation
   events/       Event mechanics (conditions, weighting, token resolution,
                 consequence application) + the data-driven event pool
+  projects/     Mayor projects (City Favor, commissioning, placement) and the
+                Wonder Age mega-projects + both catalogs
   state/        Zustand store — the only bridge between simulation and UI
   game/         The game clock hook (drives day progression)
-  rendering/    React Three Fiber low-poly city scene
-  components/   UI panels: stats bar, side panel, news feed, event modal, controls
+  rendering/    React Three Fiber low-poly city scene (incl. era skins,
+                celebrations)
+  components/   UI panels: stats bar, side panel, news feed, event modal,
+                controls, age bar
   app/          Screens: start, game, outcome
   styles/       CSS
-tests/          Vitest suites for generator, engine, and event pool integrity
+tests/          Vitest suites for generator, engine, events, projects, ages,
+                and the relaxed-balance / play-matters contracts
 ```
 
 ### Determinism
@@ -144,21 +152,53 @@ Events are pure data (`GameEventDef`) validated by tests:
   chance-based follow-ups, and can queue **chain events** days later.
 - Text supports `{city}`, `{district}`, `{faction}` tokens, resolved on trigger.
 
+### Mayor projects (`src/projects`)
+
+The phase-03 verb: spend slow-recharging **City Favor** to commission a landmark
+(a lighthouse, a bathhouse, a hedge maze...) into a district. The order is
+recorded in `projectLog` (replayable input, like `eventLog`), a scaffolded
+`Building` appears in the world immediately, and the engine clears the
+scaffolding + applies completion effects when the build days elapse. Placement
+derives from `hash(seed + ':project:' + day + ':' + defId)` so orders replay
+identically. The catalog (`src/projects/data/projects.ts`) is pool-tested like
+events; some projects are age-gated via `minAge`.
+
+### Ages (`src/simulation/ages.ts`)
+
+The city grows through five named ages — **Settlement → Village → Town → City →
+Wonder Age** — each with its own building dress (thatch → timber → stone →
+brick → gilt; see `src/rendering/eras.ts`) and its own events/headlines via
+`minAge` gates. Advancement is checked deterministically each tick (no RNG):
+every transition asks for a few soft milestones (average district development,
+population vs founding, district count, landmarks built, days in the age) and
+advances when enough of them hold — days-in-age is itself a milestone, so a
+surviving city always progresses eventually, while a city in decline simply
+stays put (ages never regress). Age-ups celebrate with a headline, fireworks
+and a banner; the age bar at the bottom of the screen tracks the journey.
+
+Entering the Wonder Age makes the council ask **which wonder to raise** (a
+choice of four, aligned with different playstyles). The chosen wonder is a
+multi-stage mega-project (`src/projects/wonders.ts`) that rises visibly over
+many days; completing it is a ninth, triumphant ending.
+
 ### Outcomes (`src/simulation/outcomes.ts`)
 
-Eight endings (utopia, golden age, collapse, ghost town, magical singularity,
-pollution wasteland, revolution, wild reclamation). Each requires its condition to
-hold for a streak of consecutive days past a minimum day, so one bad spike doesn't
-end a run — sustained trajectories do.
+Nine endings (utopia, golden age, the wonder, collapse, ghost town, magical
+singularity, pollution wasteland, revolution, wild reclamation). Each requires
+its condition to hold for a streak of consecutive days past a minimum day, so
+one bad spike doesn't end a run — sustained trajectories do.
 
 ## Adding content
 
 - **An event**: add a `GameEventDef` to `src/events/data/events.ts`. Give it a unique
   id, 2–4 choices with `effects`/`resultText`, tags for quirk bias, and optionally
-  `condition`, `involvedFaction`, `involvedDistrictType`, `minDay`, `once`. For a
-  chain, add follow-ups with `chainOnly: true, weight: 0` and reference them via
+  `condition`, `involvedFaction`, `involvedDistrictType`, `minDay`, `minAge`, `once`.
+  For a chain, add follow-ups with `chainOnly: true, weight: 0` and reference them via
   `unlocksEventId` or a `ChanceOutcome.queueEventId`. Run `npm test` — pool
   integrity (unique ids, valid chain references, choice counts) is enforced.
+- **A project**: add a `ProjectDef` to `src/projects/data/projects.ts` plus a mesh
+  case for its `BuildingKind` in `src/rendering/BuildingMesh.tsx`. Wonders work the
+  same via `src/projects/data/wonders.ts` (staged) and the wonder-council event.
 - **A quirk**: add to `src/generation/data/quirks.ts` with small `dailyEffects`
   (±0.1–0.4) and/or `eventTagBias`.
 - **A headline**: add to `src/simulation/data/headlines.ts`, optionally gated by a

@@ -24,15 +24,21 @@ import { runScriptedPlay, type PlayRun } from './play-helpers';
 // fires with a deterministic best/worst-choice policy (see tests/play-helpers.ts).
 //
 // MARGINS: these assertions use comfortable slack, not the exact measured
-// values. A teammate is concurrently retuning the headline pool, and headlines
-// share the day-tick RNG stream — so the precise outcome on any single seed can
-// shift slightly. We therefore assert aggregate medians/counts with margin, and
-// "at least one" reachability, never a specific seed's specific ending.
+// values. Content phases keep growing the event pool, and every new event
+// reshuffles which memo fires on which day — so the precise outcome on any
+// single seed shifts whenever the pool changes. We therefore assert PAIRWISE
+// per-seed comparisons (same seed, same world, only the steering differs) and
+// "at least one" reachability, never a specific seed's specific ending, and
+// never a bare aggregate of alive runs (that one quietly measures pool
+// composition: a golden-age exit removes good play's BEST run from the
+// median — phase 04's pool additions exposed exactly that failure mode).
 //
-// Measured at the time of writing (CHOICE_EFFECT_SCALE = 2.8, 24 seeds x 250d):
-//   good    median day-250 happiness (alive) 46.8 | catastrophes 4 | golden-age x2
-//   hands-off median day-250 happiness (alive) 41.0 | catastrophes 5 | triumphant 0
-//   bad     reaches revolution (~day 146) and accelerates pollution-wasteland
+// Measured at the time of writing (CHOICE_EFFECT_SCALE = 2.8, 24 seeds x 250d,
+// magic-aware good policy, phase-04 pool):
+//   pairwise good-vs-off day-250 happiness (both alive, n=16): median +1.4,
+//     11 seeds improved vs 5 worsened, big wins +6.0/+9.9/+10.9/+21.1
+//   good reaches golden-age x1 | hands-off triumphant 0
+//   bad  reaches pollution-wasteland x4 + revolution x2
 // ---------------------------------------------------------------------------
 
 const SEED_COUNT = 24;
@@ -88,12 +94,32 @@ describe('play matters: active steering beats (and can underperform) hands-off',
     SUITE_TIMEOUT_MS,
   );
 
-  it('good play beats hands-off on aggregate day-250 happiness by a real margin', () => {
-    const goodMed = aliveMedianHappiness(good);
-    const offMed = aliveMedianHappiness(off);
-    // Measured gap ~5.8; assert a comfortable >=2.5 so a small RNG-stream shift
-    // from the concurrent headline retune can't flip it.
-    expect(goodMed - offMed, `good ${goodMed} vs hands-off ${offMed}`).toBeGreaterThan(2.5);
+  it('good play beats hands-off on the same seeds (pairwise day-250 happiness)', () => {
+    // Per-seed pairing controls for seed difficulty and for runs leaving the
+    // alive pool: only seeds where BOTH runs reached day 250 are compared.
+    const diffs: number[] = [];
+    for (let i = 0; i < SEED_COUNT; i++) {
+      if (!good[i].survived || !off[i].survived) continue;
+      const g = happinessOnDay(good[i].city, TARGET_DAY);
+      const o = happinessOnDay(off[i].city, TARGET_DAY);
+      if (g == null || o == null) continue;
+      diffs.push(g - o);
+    }
+    // Measured n=16; demand a healthy comparable sample.
+    expect(diffs.length, 'need both-alive pairs to compare').toBeGreaterThanOrEqual(10);
+
+    // Steering helps on net: the median seed improves (measured +1.4), and
+    // clearly more seeds improve than worsen (measured 11 vs 5).
+    const med = median(diffs);
+    expect(med, `pairwise diffs ${diffs.map((d) => d.toFixed(1)).join(',')}`).toBeGreaterThan(0.4);
+    const improved = diffs.filter((d) => d > 0).length;
+    const worsened = diffs.filter((d) => d < 0).length;
+    expect(improved - worsened, `improved ${improved} vs worsened ${worsened}`).toBeGreaterThanOrEqual(2);
+
+    // And steering can help a LOT: a real tail of big wins (measured 4 seeds
+    // at +5 or better, up to +21).
+    const bigWins = diffs.filter((d) => d >= 5).length;
+    expect(bigWins, 'expect at least a couple of decisive wins').toBeGreaterThanOrEqual(2);
   });
 
   it('good play makes a triumphant ending reachable (hands-off never does)', () => {

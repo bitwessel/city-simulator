@@ -14,6 +14,8 @@ import {
   districtPathTargets,
 } from './sceneryLayout';
 import { districtMoodTintHex, scaleHex, mixHex, type MoodTheme } from './palette';
+import { applyEraToPalette } from './eras';
+import { currentAge } from '../simulation/ages';
 import { hashFloat } from './hash';
 
 // ---------------------------------------------------------------------------
@@ -68,17 +70,23 @@ function DistrictArea({
   );
 
   // Building palette derived once per district (color-only). `glowI` carries
-  // the mood's window-glow so skylines glitter at dusk.
+  // the mood's window-glow so skylines glitter at dusk. The city's age then
+  // re-dresses the whole palette (thatch → timber → stone → brick → gilt) so
+  // every district visibly grows up together (phase 04).
+  const era = currentAge(city);
   const buildingPalette = useMemo<BuildingPalette>(() => {
     const wall = districtMoodTintHex(district.visualStyle.baseColor, theme, district.mood);
-    return {
-      wall: scaleHex(wall, 1.12),
-      accent: district.visualStyle.accentColor,
-      trim: scaleHex(wall, 0.78),
-      glow: mixHex(district.visualStyle.accentColor, '#ffffff', 0.3),
-      glowI: theme.windowGlow,
-    };
-  }, [district.visualStyle.baseColor, district.visualStyle.accentColor, theme, district.mood]);
+    return applyEraToPalette(
+      {
+        wall: scaleHex(wall, 1.12),
+        accent: district.visualStyle.accentColor,
+        trim: scaleHex(wall, 0.78),
+        glow: mixHex(district.visualStyle.accentColor, '#ffffff', 0.3),
+        glowI: theme.windowGlow,
+      },
+      era,
+    );
+  }, [district.visualStyle.baseColor, district.visualStyle.accentColor, theme, district.mood, era]);
 
   // Decoration colors (greenery), nudged by mood.
   const decoColors = useMemo(

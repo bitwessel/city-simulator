@@ -1,4 +1,5 @@
 import type { City, CityOutcome } from '../types';
+import { getWonderDef } from '../projects/wonders';
 
 // End-state detection. Outcomes are checked each day after stats settle.
 // Most need a streak of qualifying days so a single spike doesn't end a run,
@@ -16,6 +17,22 @@ interface OutcomeDef {
 }
 
 export const OUTCOME_DEFS: OutcomeDef[] = [
+  {
+    // The Wonder Age victory (phase 04): the chosen wonder stands complete.
+    // A short streak lets the player admire the finished wonder glittering in
+    // the world for a few days before the curtain call.
+    kind: 'wonder',
+    title: 'The Wonder of the Age',
+    tone: 'triumphant',
+    minDay: 30,
+    streak: 4,
+    qualifies: (c) => c.completedWonder != null,
+    describe: (c) => {
+      const def = c.completedWonder ? getWonderDef(c.completedWonder.defId) : undefined;
+      const name = def?.name ?? 'The Wonder';
+      return `${name} stands complete over ${c.name}, and the world has noticed. Pilgrims arrive by the cartload, poets run out of rhymes, and neighboring mayors write letters that are ninety percent congratulations and ten percent seething. They will tell stories of this city — and of the mayor who dreamed it upward — for a very long time.`;
+    },
+  },
   {
     kind: 'utopia',
     title: 'The Shining City',

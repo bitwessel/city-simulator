@@ -17,6 +17,11 @@ import type { ProjectDef } from '../../types';
 // Budgeting (favor): START_FAVOR 10, FAVOR_CAP 24, regen ~0.5-0.9/day (see
 // src/projects/projects.ts). Costs 8-16 are sized so a project lands roughly
 // every 10-20 days.
+//
+// Age gating (phase 04): the grandest projects carry a `minAge` and unlock as
+// the city grows up (a settlement of tents has no business raising an
+// observatory dome). Cheap starter projects stay ungated so every district
+// type keeps >=1 commissionable option from day one.
 // ---------------------------------------------------------------------------
 
 export const PROJECT_POOL: ProjectDef[] = [
@@ -71,6 +76,7 @@ export const PROJECT_POOL: ProjectDef[] = [
     buildDays: 11,
     districtTypes: ['academy', 'noble-hill', 'magical'],
     building: 'observatory',
+    minAge: 'town',
     completionEffects: { culture: 5, magic: 4, trust: 2 },
     dailyEffects: { culture: 0.1, magic: 0.05 },
     factionEffects: { archivists: 12, mages: 6 },
@@ -99,6 +105,7 @@ export const PROJECT_POOL: ProjectDef[] = [
     buildDays: 10,
     districtTypes: ['festival', 'market', 'old-town'],
     building: 'amphitheater',
+    minAge: 'village',
     completionEffects: { culture: 6, happiness: 4, beauty: 2 },
     dailyEffects: { culture: 0.12 },
     factionEffects: { 'street-performers': 14, merchants: 4 },
@@ -113,6 +120,7 @@ export const PROJECT_POOL: ProjectDef[] = [
     buildDays: 9,
     districtTypes: ['garden', 'festival', 'noble-hill'],
     building: 'menagerie',
+    minAge: 'village',
     completionEffects: { happiness: 5, culture: 3, beauty: 2 },
     dailyEffects: { happiness: 0.08, culture: 0.05 },
     factionEffects: { gardeners: 8, 'street-performers': 6 },
@@ -183,6 +191,7 @@ export const PROJECT_POOL: ProjectDef[] = [
     buildDays: 10,
     districtTypes: ['magical', 'ruins', 'academy'],
     building: 'moondial',
+    minAge: 'town',
     completionEffects: { magic: 5, culture: 4, beauty: 2 },
     dailyEffects: { magic: 0.1, culture: 0.05 },
     factionEffects: { mages: 12, archivists: 6 },

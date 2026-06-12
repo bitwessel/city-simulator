@@ -208,6 +208,8 @@ describe('project lifecycle', () => {
   it('enforces the per-district project cap and rejects duplicates', () => {
     let city = freshCity('lifecycle-cap');
     city.favor = 100;
+    // A mature city so phase-04 age gates don't mask the cap/duplicate checks.
+    city.age = 'city';
     // fountain-plaza is `any`; pick a district and load it up with distinct
     // projects until the cap, all of which must allow that district type.
     const district = city.districts[0];
