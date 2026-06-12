@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ActiveEvent, City } from '../src/types';
 import { applyEventChoice, lapseEvent, simulateDay } from '../src/simulation/engine';
+import { declareEdict } from '../src/simulation/edicts';
 import { OUTCOME_DEFS } from '../src/simulation/outcomes';
 import { MAX_DISTRICTS } from '../src/simulation/expansion';
 import {
@@ -493,6 +494,52 @@ describe('simulation engine', () => {
     }
     expect(current.stats.beauty).toBeLessThan(start.beauty);
     expect(current.stats.happiness).toBeLessThan(start.happiness);
+  });
+});
+
+// ----- Edict determinism (phase 05 Standing Edicts) ---------------------------
+
+/**
+ * Drive a city for `days` days with events suppressed, applying edict
+ * declarations on scheduled days. Deterministic for a given seed + schedule.
+ */
+function runWithEdicts(
+  seed: string,
+  days: number,
+  decls: { day: number; edictId: string | null }[],
+): City {
+  let city = freshCity(seed);
+  for (let i = 0; i < days; i++) {
+    if (city.outcome) break;
+    for (const decl of decls.filter((d) => d.day === city.day)) {
+      city = declareEdict(city, decl.edictId);
+    }
+    city = simulateDay(city, { suppressEvents: true }).city;
+  }
+  return city;
+}
+
+describe('edict determinism', () => {
+  it('same seed + same declaration schedule replays identically', () => {
+    const decls = [
+      { day: 1, edictId: 'festival-season' },
+      { day: 12, edictId: null },           // lift after cooldown
+      { day: 23, edictId: 'trade-push' },   // switch after second cooldown
+    ];
+    const runA = runWithEdicts('edict-det-1', 40, decls);
+    const runB = runWithEdicts('edict-det-1', 40, decls);
+    expect(runA.stats).toEqual(runB.stats);
+    expect(runA.activeEdict).toBe(runB.activeEdict);
+    expect(JSON.stringify(runA.edictLog)).toBe(JSON.stringify(runB.edictLog));
+    expect(JSON.stringify(runA.news)).toBe(JSON.stringify(runB.news));
+  });
+
+  it('edicted run diverges from un-edicted run', () => {
+    const decls = [{ day: 1, edictId: 'festival-season' }];
+    const with_ = runWithEdicts('edict-diverge', 30, decls);
+    const without = runWithEdicts('edict-diverge', 30, []);
+    // The drift should have moved stats apart.
+    expect(JSON.stringify(with_.stats)).not.toBe(JSON.stringify(without.stats));
   });
 });
 

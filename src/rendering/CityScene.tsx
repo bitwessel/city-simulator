@@ -12,6 +12,7 @@ import { Scenery } from './Scenery';
 import { Atmosphere } from './Atmosphere';
 import { Citizens } from './Citizens';
 import { Lanterns } from './Lanterns';
+import { EdictProps } from './EdictProps';
 import { ChimneySmoke } from './ChimneySmoke';
 import { Celebration } from './Celebration';
 import { DaylightRig } from './DaylightRig';
@@ -261,6 +262,7 @@ export function CityScene({ city, selectedDistrictId, onSelectDistrict, clockRat
         moodKey={moodKey}
       />
       <Lanterns city={city} />
+      <EdictProps city={city} />
       <ChimneySmoke city={city} />
       <Citizens city={city} />
       <Celebration city={city} center={center} extent={extent} />

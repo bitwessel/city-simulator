@@ -38,6 +38,12 @@ try {
   await page.locator('input').first().fill('smoke-test-city');
   await page.locator('button', { hasText: /create new city/i }).click();
 
+  // 2b. Founding screen: click "Surprise me" to skip the ritual and enter game.
+  await page.waitForSelector('button:has-text("Surprise me")', { timeout: 10000 });
+  await page.screenshot({ path: `${SHOTS}/1b-founding.png` });
+  log('founding screen rendered');
+  await page.locator('button', { hasText: /surprise me/i }).click();
+
   // 3. Game screen: wait for the day counter and canvas
   await page.waitForSelector('canvas', { timeout: 15000 });
   // Day counter is in both the topbar and the control bar

@@ -13,10 +13,10 @@ const LANTERNS = [
 ];
 
 export function StartScreen() {
-  const newGame = useGameStore((s) => s.newGame);
+  const beginFounding = useGameStore((s) => s.beginFounding);
   const [seed, setSeed] = useState('');
 
-  const create = () => newGame(seed);
+  const create = () => beginFounding(seed);
 
   return (
     <div className="start">

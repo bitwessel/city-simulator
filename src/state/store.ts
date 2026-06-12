@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { ActiveEvent, ActiveWonder, AgeId, City, CompletedWonder } from '../types';
+import type { ActiveEvent, ActiveWonder, AgeId, City, CompletedWonder, FoundingChoices } from '../types';
 import { AGE_ORDER } from '../types';
 import { generateCity, randomSeedString } from '../generation/generator';
 import {
@@ -9,11 +9,12 @@ import {
   simulateDay,
 } from '../simulation/engine';
 import { commissionProject } from '../projects/projects';
+import { declareEdict } from '../simulation/edicts';
 
 // The single source of truth for the UI. All game logic stays in the
 // simulation/generation modules; the store just routes actions to them.
 
-export type Screen = 'start' | 'game' | 'outcome';
+export type Screen = 'start' | 'founding' | 'game' | 'outcome';
 
 /** Days advanced per second at each speed setting (0 = paused). */
 export const SPEED_OPTIONS = [0, 0.5, 1, 2.5] as const;
@@ -36,8 +37,14 @@ export interface GameStore {
   panelOpen: boolean;
   /** Bumped on every new game so the 3D scene fully remounts. */
   runId: number;
+  /** Resolved seed waiting for founding ritual confirmation. */
+  pendingSeed: string | null;
 
   newGame: (seedInput?: string) => void;
+  /** Resolve the seed and transition to the founding screen. */
+  beginFounding: (seedInput?: string) => void;
+  /** Apply founding choices and enter the game. Pass no argument for "Surprise me". */
+  confirmFounding: (choices?: FoundingChoices) => void;
   advanceDay: () => void;
   setSpeed: (speed: SpeedIndex) => void;
   openEvent: () => void;
@@ -51,6 +58,8 @@ export interface GameStore {
    * (the pure helper holds all the validation logic).
    */
   startProject: (districtId: string, defId: string) => void;
+  /** Declare (or lift, when edictId is null) a standing edict. No-op when invalid. */
+  declareEdict: (edictId: string | null) => void;
   selectDistrict: (id: string | null) => void;
   selectFaction: (id: string | null) => void;
   /** Mobile only: open/close the panel popup. */
@@ -69,6 +78,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   selectedFactionId: null,
   panelOpen: false,
   runId: 0,
+  pendingSeed: null,
 
   newGame: (seedInput) => {
     const seed = seedInput && seedInput.trim().length > 0 ? seedInput.trim() : randomSeedString();
@@ -83,6 +93,31 @@ export const useGameStore = create<GameStore>((set, get) => ({
       selectedDistrictId: null,
       selectedFactionId: null,
       panelOpen: false,
+      runId: s.runId + 1,
+    }));
+  },
+
+  beginFounding: (seedInput) => {
+    const seed = seedInput && seedInput.trim().length > 0 ? seedInput.trim() : randomSeedString();
+    set({ pendingSeed: seed, screen: 'founding' });
+  },
+
+  confirmFounding: (choices) => {
+    const { pendingSeed } = get();
+    const seed = pendingSeed ?? randomSeedString();
+    // Only pass choices when at least one field is set; otherwise default path.
+    const hasChoices = choices && (choices.siteId || choices.patronQuirkId || (choices.name && choices.name.trim().length > 0));
+    const city = hasChoices ? generateCity(seed, choices) : generateCity(seed);
+    set((s) => ({
+      screen: 'game',
+      city,
+      speed: 2,
+      activeEvent: null,
+      eventOpen: false,
+      selectedDistrictId: null,
+      selectedFactionId: null,
+      panelOpen: false,
+      pendingSeed: null,
       runId: s.runId + 1,
     }));
   },
@@ -137,6 +172,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
     // commissionProject is pure and returns the same city when the order is
     // invalid, so this set is a harmless no-op in that case.
     set({ city: commissionProject(city, districtId, defId) });
+  },
+
+  declareEdict: (edictId) => {
+    const { city } = get();
+    if (!city || city.outcome) return;
+    set({ city: declareEdict(city, edictId) });
   },
 
   selectDistrict: (id) =>

@@ -22,6 +22,9 @@ const page = await context.newPage();
 await page.goto('http://localhost:5173', { waitUntil: 'networkidle' });
 await page.locator('input').first().fill(seed);
 await page.locator('button', { hasText: /create new city/i }).click();
+// Founding screen: skip the ritual with the defaults.
+await page.waitForSelector('button:has-text("Surprise me")', { timeout: 10000 });
+await page.locator('button', { hasText: /surprise me/i }).click();
 await page.waitForSelector('canvas', { timeout: 15000 });
 await page.waitForTimeout(3000);
 

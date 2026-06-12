@@ -26,6 +26,7 @@ import { ageAtLeast, checkAgeUp, currentAge } from './ages';
 import { FAVOR_CAP, favorRegen, getFavor, getProjectDef } from '../projects/projects';
 import { applyWonderDrift, startWonder, tickWonder } from '../projects/wonders';
 import { applyFactionEffects, applyStatDelta } from '../events/system';
+import { EDICT_POOL } from './data/edicts';
 
 // ---------------------------------------------------------------------------
 // The simulation engine. `simulateDay` is a pure function: given a city it
@@ -67,6 +68,7 @@ export function simulateDay(
 
   regenFavor(city);
   applyQuirkDrift(city);
+  applyEdictDrift(city);
   applyProjectDrift(city);
   applyWonderDrift(city);
   updateResources(city);
@@ -151,6 +153,20 @@ function applyQuirkDrift(city: City): void {
         const k = key as (typeof BOUNDED_STAT_KEYS)[number];
         city.stats[k] = clampStat(city.stats[k] + value);
       }
+    }
+  }
+}
+
+function applyEdictDrift(city: City): void {
+  if (!city.activeEdict) return;
+  const def = EDICT_POOL.find((e) => e.id === city.activeEdict);
+  if (!def) return;
+  for (const [key, value] of Object.entries(def.dailyEffects)) {
+    if (key === 'population') {
+      city.stats.population = Math.max(0, Math.round(city.stats.population + value));
+    } else {
+      const k = key as (typeof BOUNDED_STAT_KEYS)[number];
+      city.stats[k] = clampStat(city.stats[k] + value);
     }
   }
 }

@@ -1,0 +1,175 @@
+/* ===========================================================================
+   Founding screen — terrain flyover + three founding choices.
+   Reuses the same dawn-sky aesthetic as the start screen.
+   =========================================================================== */
+
+.founding {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 50% 118%, var(--mm-dawn-3) 0%, transparent 58%),
+    radial-gradient(ellipse at 22% 4%, #fff4dc 0%, transparent 48%),
+    linear-gradient(180deg, #fce9c6 0%, #f6cfa6 46%, #e9b9c0 100%);
+}
+
+/* 3D canvas fills the whole screen (orbit behind the overlay) */
+.founding__scene {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+/* Frosted-glass overlay panel on the right */
+.founding__panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  width: min(420px, 100vw);
+  display: flex;
+  flex-direction: column;
+  padding: 28px 24px 24px;
+  gap: 18px;
+  overflow-y: auto;
+  background: rgba(252, 246, 235, 0.88);
+  border-left: 1px solid rgba(120, 92, 56, 0.18);
+  -webkit-backdrop-filter: blur(16px) saturate(1.1);
+  backdrop-filter: blur(16px) saturate(1.1);
+  box-shadow: -8px 0 32px rgba(74, 53, 34, 0.12);
+  scrollbar-width: thin;
+  scrollbar-color: var(--mm-brass) transparent;
+  animation: mm-slide-right 0.45s var(--mm-ease);
+}
+
+.founding__title {
+  font-family: var(--mm-display);
+  font-weight: 600;
+  font-size: var(--mm-fs-xl);
+  background: linear-gradient(180deg, #e0aa4a, var(--mm-brass) 55%, #9c6f28);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  margin: 0 0 2px;
+  line-height: 1.1;
+}
+.founding__subtitle {
+  font-size: var(--mm-fs-sm);
+  color: var(--mm-ink-faint);
+  font-style: italic;
+  margin: 0;
+}
+
+.founding__section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.founding__section-label {
+  font-size: var(--mm-fs-xs);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mm-ink-faint);
+  margin: 0;
+}
+
+/* Site and patron cards */
+.founding__cards {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.founding__card {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+  border-radius: var(--mm-radius-sm);
+  border: 1.5px solid rgba(120, 92, 56, 0.16);
+  background: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+  text-align: left;
+}
+.founding__card:hover {
+  border-color: var(--mm-brass);
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: var(--mm-shadow-sm);
+}
+.founding__card--selected {
+  border-color: var(--mm-brass);
+  background: linear-gradient(135deg, rgba(240, 199, 94, 0.18), rgba(255, 255, 255, 0.7));
+  box-shadow: 0 0 0 2px rgba(224, 170, 74, 0.3), var(--mm-shadow-sm);
+}
+.founding__card-name {
+  font-weight: 700;
+  font-size: var(--mm-fs-base);
+  color: var(--mm-ink);
+}
+.founding__card-desc {
+  font-size: var(--mm-fs-sm);
+  color: var(--mm-ink-soft);
+  line-height: 1.4;
+}
+
+/* Name input */
+.founding__name-input {
+  width: 100%;
+  font-family: var(--mm-body);
+  font-weight: 600;
+  font-size: var(--mm-fs-md);
+  padding: 11px 14px;
+  border-radius: var(--mm-radius-sm);
+  border: 1.5px solid rgba(120, 92, 56, 0.3);
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--mm-ink);
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  box-sizing: border-box;
+}
+.founding__name-input:focus {
+  border-color: var(--mm-brass);
+  box-shadow: 0 0 0 3px rgba(224, 170, 74, 0.25);
+}
+
+/* Action buttons */
+.founding__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 6px;
+}
+.founding__actions .mm-btn {
+  width: 100%;
+  padding: 13px;
+  font-size: var(--mm-fs-md);
+  text-align: center;
+}
+
+/* Site marker pins */
+.founding-marker {
+  cursor: pointer;
+}
+
+@media (max-width: 600px) {
+  .founding__panel {
+    top: auto;
+    right: 0;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    height: 55vh;
+    border-left: none;
+    border-top: 1px solid rgba(120, 92, 56, 0.18);
+    box-shadow: 0 -8px 32px rgba(74, 53, 34, 0.12);
+    animation: mm-slide-up 0.45s var(--mm-ease);
+  }
+}

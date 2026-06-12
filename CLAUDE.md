@@ -9,10 +9,11 @@ Feature work follows the phase specs in `prompts/` (build order and an index are
 
 ## Where the project is
 
-- **Phases 01–04 — shipped:** living-world graphics + day/night, relaxed balance,
-  mayor projects, ages & progression (five ages, era skins, age bar, the wonder arc).
-- **Phase 05 — next:** edicts & founding. Spec: `prompts/05-edicts-and-founding.md`.
-- **Phases 06–08 — not started:** citizens/chronicle, worldsmith pipeline & session.
+- **Phases 01–05 — shipped:** living-world graphics + day/night, relaxed balance,
+  mayor projects, ages & progression (five ages, era skins, age bar, the wonder arc),
+  edicts & founding (standing edicts with prop layers, the founding ritual).
+- **Phase 06 — next:** citizens & chronicle. Spec: `prompts/06-citizens-and-chronicle.md`.
+- **Phases 07–08 — not started:** worldsmith pipeline & session.
 
 The roadmap table in `00-vision.md` is the source of truth for build order and rationale.
 
@@ -61,6 +62,12 @@ node scripts/age-check.mjs [seed] # phase 04: forces all five era skins + the wo
                                   #   stages (dev-only window.__mmDebug bridge) and
                                   #   screenshots each — LOOK at them
 node scripts/daynight-check.mjs [seed]     # day/night-cycle screenshots
+node scripts/edict-check.mjs [seed]   # phase 05: declares all five edicts through the
+                                  #   real UI (steps 11 days between to clear the
+                                  #   cooldown), screenshots each prop layer + a
+                                  #   lifted-edict control shot — LOOK at them
+node scripts/founding-check.mjs [seed]     # phase 05: founding ritual with real choices
+                                  #   (site/patron/name); asserts the briefing reacts
 node scripts/fps-probe.mjs [seed] [?nofx]  # headed FPS probe — headless = SwiftShader,
                                   #   ~1fps and useless; PostFX auto-degrades, sample
                                   #   early AND late. `?nofx` disables the post chain.

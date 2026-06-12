@@ -379,6 +379,36 @@ export interface Resource {
   trend: number;
 }
 
+// ----- Founding choices (phase 05, slice 2) ------------------------------------
+
+/** The player's day-0 founding choices — replayable inputs to generation. */
+export interface FoundingChoices {
+  siteId?: 'a' | 'b' | 'c';
+  patronQuirkId?: string;
+  name?: string;
+}
+
+// ----- Edicts (phase 05) -------------------------------------------------------
+
+export interface EdictDef {
+  id: string;
+  name: string;
+  proclamation: string;
+  blurb: string;
+  dailyEffects: StatDelta;
+  eventTagBias?: Record<string, number>;
+  factionReactions?: Partial<Record<FactionArchetype, number>>;
+  visual: {
+    prop: 'lanterns' | 'planters' | 'crates' | 'scaffolds';
+    paletteLean?: string;
+  };
+}
+
+export interface EdictOrder {
+  day: number;
+  edictId: string | null;
+}
+
 // ----- Mayor projects (phase 03) ---------------------------------------------
 
 /**
@@ -729,6 +759,14 @@ export interface City {
   activeWonder?: ActiveWonder;
   /** The finished wonder — drives the triumphant wonder ending. */
   completedWonder?: CompletedWonder;
+  /** The active standing edict id, if one is in effect (phase 05). */
+  activeEdict?: string;
+  /** The day the most recent edict (or lift) was declared. */
+  edictDeclaredDay?: number;
+  /** Full log of edict declarations — replayable input like `eventLog`. */
+  edictLog?: EdictOrder[];
+  /** The founding choices made during the ritual; absent on default-path runs. */
+  founding?: FoundingChoices;
 }
 
 // ----- Engine results -----------------------------------------------------------------------

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { BuildingKind, DistrictType } from '../src/types';
-import { generateCity } from '../src/generation/generator';
+import { generateCity, foundingSiteCandidates, foundingPatronOptions, DISTRICT_MIN_GAP } from '../src/generation/generator';
+import { generateTerrain, isDistrictSiteOnLand } from '../src/generation/terrain';
 import { BOUNDED_STAT_KEYS } from '../src/types';
 import { DISTRICT_ARCHETYPES } from '../src/generation/data/names';
 import { distance } from '../src/utils/math';
@@ -143,6 +144,121 @@ describe('procedural city generator', () => {
           expect(city.districts.some((d) => d.id === faction.homeDistrictId)).toBe(true);
         }
       }
+    }
+  });
+});
+
+// =============================================================================
+// Slice 2 — Founding Ritual
+// =============================================================================
+
+/** Compact structural snapshot for a city (avoids snapshot-unfriendly fields). */
+function citySnapshot(seed: string) {
+  const c = generateCity(seed);
+  return {
+    name: c.name,
+    districts: c.districts.map((d) => [d.type, d.position] as const),
+    quirks: c.quirks.map((q) => q.id),
+    stats: JSON.stringify(c.stats),
+  };
+}
+
+describe('founding — default-path snapshot guard', () => {
+  const SEEDS = ['ember-42', 'smoke-test-city', 'invariant-17'];
+
+  it('default path is byte-identical across seeds (snapshot)', () => {
+    for (const seed of SEEDS) {
+      const snap = citySnapshot(seed);
+      expect(snap).toMatchSnapshot(seed);
+    }
+  });
+
+  it('generateCity(seed) === generateCity(seed, undefined) for several seeds', () => {
+    for (const seed of SEEDS) {
+      expect(JSON.stringify(generateCity(seed))).toBe(
+        JSON.stringify(generateCity(seed, undefined)),
+      );
+    }
+  });
+});
+
+describe('founding — same seed + same choices = identical city', () => {
+  it('two calls with identical choices produce identical output', () => {
+    const seed = 'test-founding-42';
+    const choices = { siteId: 'b' as const, patronQuirkId: 'talking-statues', name: 'Testburg' };
+    const a = generateCity(seed, choices);
+    const b = generateCity(seed, choices);
+    expect(JSON.stringify(a)).toBe(JSON.stringify(b));
+  });
+});
+
+describe('founding — choices shape the city', () => {
+  it('site choice moves old-town position', () => {
+    const seed = 'shape-test-7';
+    const terrain = generateTerrain(seed);
+    const sites = foundingSiteCandidates(seed, terrain);
+
+    const cityA = generateCity(seed, { siteId: 'a' });
+    const cityB = generateCity(seed, { siteId: 'b' });
+    const oldTownA = cityA.districts.find((d) => d.type === 'old-town')!;
+    const oldTownB = cityB.districts.find((d) => d.type === 'old-town')!;
+
+    // Old-town should land near (within ~DISTRICT_MIN_GAP) its chosen site.
+    expect(distance(oldTownA.position, sites[0].position)).toBeLessThan(DISTRICT_MIN_GAP);
+    expect(distance(oldTownB.position, sites[1].position)).toBeLessThan(DISTRICT_MIN_GAP);
+
+    // Different sites → different old-town positions.
+    expect(distance(oldTownA.position, oldTownB.position)).toBeGreaterThan(0.5);
+  });
+
+  it('patronQuirkId X → city.quirks contains X exactly once', () => {
+    const city = generateCity('patron-test-3', {
+      patronQuirkId: 'singing-river',
+    });
+    const hits = city.quirks.filter((q) => q.id === 'singing-river');
+    expect(hits.length).toBe(1);
+  });
+
+  it('name override is respected', () => {
+    const city = generateCity('name-test-1', { name: 'Testburg' });
+    expect(city.name).toBe('Testburg');
+  });
+
+  it('founding choices are stored on city.founding', () => {
+    const choices = { siteId: 'c' as const, name: 'Stored' };
+    const city = generateCity('store-test', choices);
+    expect(city.founding).toEqual(choices);
+  });
+});
+
+describe('founding — candidate site validity', () => {
+  it('returns exactly 3 sites for ~20 seeds, on-land, pairwise spaced', () => {
+    for (let i = 0; i < 20; i++) {
+      const seed = `candidate-${i}`;
+      const terrain = generateTerrain(seed);
+      const sites = foundingSiteCandidates(seed, terrain);
+      expect(sites.length).toBe(3);
+      expect(new Set(sites.map((s) => s.id)).size).toBe(3);
+      for (const site of sites) {
+        expect(isDistrictSiteOnLand(terrain, site.position, 10)).toBe(true);
+      }
+      for (let a = 0; a < sites.length; a++) {
+        for (let b = a + 1; b < sites.length; b++) {
+          const d = distance(sites[a].position, sites[b].position);
+          expect(d).toBeGreaterThanOrEqual(DISTRICT_MIN_GAP - 1e-6);
+        }
+      }
+    }
+  });
+});
+
+describe('founding — patron options', () => {
+  it('returns 3 quirks from the pool', () => {
+    const patrons = foundingPatronOptions('patron-opts-1');
+    expect(patrons.length).toBe(3);
+    for (const p of patrons) {
+      expect(typeof p.id).toBe('string');
+      expect(typeof p.title).toBe('string');
     }
   });
 });

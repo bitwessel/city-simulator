@@ -31,6 +31,9 @@ try {
   await page.waitForSelector('text=Mythic Mayor', { timeout: 15000 });
   await page.locator('input').first().fill('project-check-1');
   await page.locator('button', { hasText: /create new city/i }).click();
+  // Founding screen: skip the ritual with the defaults.
+  await page.waitForSelector('button:has-text("Surprise me")', { timeout: 10000 });
+  await page.locator('button', { hasText: /surprise me/i }).click();
   await page.waitForSelector('canvas', { timeout: 15000 });
   await page.waitForTimeout(2500);
   // Pause the clock so commissioning happens on a stable early day (the build

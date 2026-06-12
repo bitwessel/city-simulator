@@ -7,7 +7,9 @@ import type {
   CityStats,
   CitizenGroup,
   District,
+  DistrictType,
   Faction,
+  FoundingChoices,
   Resource,
   Risk,
   RiskKind,
@@ -24,6 +26,8 @@ import {
   generateTerrain,
   isDistrictSiteOnLand,
   isDistrictSiteRiverside,
+  riverDistanceAt,
+  terrainHeightAt,
 } from './terrain';
 import {
   BRIEFING_OPENERS,
@@ -47,26 +51,137 @@ export function randomSeedString(): string {
   return `${rng.pick(CITY_PREFIXES).toLowerCase()}-${rng.int(100, 9999)}`;
 }
 
-export function generateCity(seedRaw: string): City {
+// ----- Founding Ritual (phase 05, slice 2) ------------------------------------
+
+export interface FoundingSite {
+  id: 'a' | 'b' | 'c';
+  position: { x: number; z: number };
+  vibe: string;
+  favoredTypes: DistrictType[];
+}
+
+/**
+ * Derive 3 candidate founding sites from a seed's own sub-stream.
+ * Never perturbs the main generation RNG — uses `seed + ':founding'`.
+ */
+export function foundingSiteCandidates(seedRaw: string, terrain: TerrainData): FoundingSite[] {
+  const rng = new Rng(hashSeed(`${seedRaw}:founding`));
+  const IDS: FoundingSite['id'][] = ['a', 'b', 'c'];
+  const sites: { position: { x: number; z: number } }[] = [];
+  const defaultRadius = 10;
+
+  for (let s = 0; s < 3; s++) {
+    let placed = false;
+    // Multiple attempts: first strict (spacing + land), then relaxed spacing.
+    for (let attempt = 0; attempt < 120 && !placed; attempt++) {
+      // Golden-angle / ring sweep with rng jitter, similar to firstDistrictPosition.
+      const jitteredAngle = (attempt + s * 40) * 2.39996 + rng.range(-0.4, 0.4);
+      const r = 18 + attempt * 1.8 + s * 8 + rng.range(-5, 12);
+      const candidate = {
+        x: Math.cos(jitteredAngle) * r,
+        z: Math.sin(jitteredAngle) * r,
+      };
+      const minSpacing = attempt < 80 ? DISTRICT_MIN_GAP : DISTRICT_MIN_GAP * 0.6;
+      const spacedOk = sites.every((p) => distance(p.position, candidate) >= minSpacing);
+      if (!spacedOk) continue;
+      if (!isDistrictSiteOnLand(terrain, candidate, defaultRadius)) continue;
+      sites.push({ position: candidate });
+      placed = true;
+    }
+    if (!placed) {
+      // Last-resort: use a deterministic fallback position so we always get 3.
+      const angle = s * 2.1;
+      const r = 25 + s * 15;
+      sites.push({ position: { x: Math.cos(angle) * r, z: Math.sin(angle) * r } });
+    }
+  }
+
+  return sites.map((s, i) => {
+    const pos = s.position;
+    const riverDist = riverDistanceAt(terrain, pos.x, pos.z);
+    const h = terrainHeightAt(terrain, pos.x, pos.z);
+    // Classify: riverside if close to water; elevated if notably high; else forest edge.
+    const halfW = terrain.river.width / 2;
+    const isRiverside = riverDist < halfW + 14;
+    const isElevated = h > terrain.baseHeight + 0.6;
+    let vibe: string;
+    let favoredTypes: DistrictType[];
+    if (isRiverside) {
+      vibe = 'riverside — trade will come to you';
+      favoredTypes = ['harbor', 'market'];
+    } else if (isElevated) {
+      vibe = 'hilltop — defensible and beautiful';
+      favoredTypes = ['noble-hill', 'academy'];
+    } else {
+      vibe = 'forest edge — mushrooms, probably';
+      favoredTypes = ['forest-edge', 'garden'];
+    }
+    return { id: IDS[i], position: pos, vibe, favoredTypes };
+  });
+}
+
+/**
+ * 3 patron quirk options drawn from the quirk pool, from their own sub-stream.
+ * Shown on the founding screen; the player picks one to replace quirks[0].
+ */
+export function foundingPatronOptions(seedRaw: string): CityQuirk[] {
+  const rng = new Rng(hashSeed(`${seedRaw}:founding:patrons`));
+  return rng.pickMany(QUIRK_POOL, 3);
+}
+
+export function generateCity(seedRaw: string, founding?: FoundingChoices): City {
   const seed: WorldSeed = { raw: seedRaw, value: hashSeed(seedRaw) };
   const rng = new Rng(seed.value);
 
-  const name = generateCityName(rng);
+  // generateCityName draws from rng; stream position preserved regardless of founding.
+  const generatedName = generateCityName(rng);
   const tagline = rng.pick(CITY_TAGLINES);
 
   // Terrain first: districts are placed onto it. Its own hashed sub-stream
   // keeps the main rng sequence independent of terrain tuning.
   const terrain = generateTerrain(seedRaw);
-  const districts = generateDistricts(rng, terrain);
+
+  // Resolve chosen founding site (sub-stream only; never touches main rng).
+  let chosenSite: FoundingSite | undefined;
+  if (founding?.siteId) {
+    const sites = foundingSiteCandidates(seedRaw, terrain);
+    chosenSite = sites.find((s) => s.id === founding.siteId);
+  }
+
+  const districts = generateDistricts(rng, terrain, chosenSite);
   const roads = generateRoads(rng, districts);
   const factions = generateFactions(rng, districts);
   assignDominantFactions(districts, factions);
   const citizenGroups = generateCitizenGroups(rng, districts);
-  const quirks = rng.pickMany(QUIRK_POOL, rng.int(2, 4));
+
+  // Quirks: main-stream draw preserved; patron choice is post-processing only.
+  const rolledQuirks = rng.pickMany(QUIRK_POOL, rng.int(2, 4));
+  let quirks = rolledQuirks;
+  if (founding?.patronQuirkId) {
+    const patronDef = QUIRK_POOL.find((q) => q.id === founding.patronQuirkId);
+    if (patronDef) {
+      // Replace quirks[0] with the patron; deduplicate if it was already rolled.
+      const withoutPatron = quirks.filter((q) => q.id !== patronDef.id);
+      quirks = [patronDef, ...withoutPatron.slice(1)];
+    }
+  }
+
+  // Biasing district types toward the chosen site (sub-stream draw only).
+  if (chosenSite) {
+    applyFavoredDistrictTypes(districts, chosenSite, seedRaw);
+  }
+
   const resources = generateResources(rng);
   const stats = generateStartingStats(rng, districts, citizenGroups);
   const risks = deriveStartingRisks(rng, stats, districts);
-  const briefing = generateBriefing(rng, name, quirks, factions, risks);
+
+  // Name: main-stream draw preserved; name override is post-processing.
+  const name =
+    founding?.name && founding.name.trim().length > 0
+      ? founding.name.trim()
+      : generatedName;
+
+  const briefing = generateBriefing(rng, name, quirks, factions, risks, chosenSite);
 
   const city: City = {
     seed,
@@ -100,6 +215,7 @@ export function generateCity(seedRaw: string): City {
     foundingPopulation: stats.population,
     lastDistrictFoundedDay: 0,
     terrain,
+    ...(founding ? { founding } : {}),
   };
   city.history.push({ day: 1, stats: { ...stats } });
   city.mood = deriveCityMood(city.stats);
@@ -118,7 +234,11 @@ function generateCityName(rng: Rng): string {
 
 // ----- Districts -------------------------------------------------------------
 
-function generateDistricts(rng: Rng, terrain: TerrainData): District[] {
+function generateDistricts(
+  rng: Rng,
+  terrain: TerrainData,
+  chosenSite?: FoundingSite,
+): District[] {
   const count = rng.int(5, 8);
   // Old town is always present; the rest are drawn without replacement.
   const oldTown = DISTRICT_ARCHETYPES.find((d) => d.type === 'old-town')!;
@@ -132,7 +252,7 @@ function generateDistricts(rng: Rng, terrain: TerrainData): District[] {
 
   // Lay districts out around the center with minimum spacing, off the river
   // (harbors instead hug it) and away from steep patches.
-  const positions = layoutPositions(rng, picked, radii, terrain);
+  const positions = layoutPositions(rng, picked, radii, terrain, chosenSite);
 
   return picked.map((arch, i) => {
     const radius = radii[i];
@@ -209,9 +329,10 @@ function layoutPositions(
   picked: DistrictArchetype[],
   radii: number[],
   terrain: TerrainData,
+  chosenSite?: FoundingSite,
 ): { x: number; z: number }[] {
   const positions: { x: number; z: number }[] = [
-    firstDistrictPosition(terrain, radii[0]),
+    firstDistrictPosition(terrain, radii[0], chosenSite?.position),
   ];
   for (let i = 1; i < picked.length; i++) {
     positions.push(
@@ -226,22 +347,24 @@ function layoutPositions(
 }
 
 /**
- * The founding district (old town) prefers the map origin. The river is
- * generated to keep clear of it, but if the origin still fails the land check
- * (a steep patch, an unlucky meander) walk a deterministic golden-angle
- * spiral outward until a valid site appears. No rng: pure from the terrain.
+ * The founding district (old town) prefers the map origin (or a chosen site
+ * hint when the player picks one). Walks a deterministic golden-angle spiral
+ * outward from the hint until a valid on-land site appears. No rng draws.
  */
 function firstDistrictPosition(
   terrain: TerrainData,
   radius: number,
+  hint?: { x: number; z: number },
 ): { x: number; z: number } {
+  const ox = hint?.x ?? 0;
+  const oz = hint?.z ?? 0;
   for (let k = 0; k < 80; k++) {
     const r = k * 3;
     const a = k * 2.39996; // golden angle
-    const candidate = { x: Math.cos(a) * r, z: Math.sin(a) * r };
+    const candidate = { x: ox + Math.cos(a) * r, z: oz + Math.sin(a) * r };
     if (isDistrictSiteOnLand(terrain, candidate, radius)) return candidate;
   }
-  return { x: 0, z: 0 };
+  return hint ?? { x: 0, z: 0 };
 }
 
 /** Optional terrain constraints for `nextDistrictPosition`. */
@@ -714,6 +837,43 @@ function deriveStartingRisks(
   return risks;
 }
 
+/**
+ * After the main-stream district-type picks, try to ensure at least one
+ * favoredType from the chosen site appears in the district list. Uses a
+ * fresh sub-stream (no main-stream draws) and swaps one non-old-town slot
+ * with the favored type if none were rolled.
+ */
+function applyFavoredDistrictTypes(
+  districts: District[],
+  chosenSite: FoundingSite,
+  seedRaw: string,
+): void {
+  const alreadyHasFavored = districts.some((d) =>
+    chosenSite.favoredTypes.includes(d.type as DistrictType),
+  );
+  if (alreadyHasFavored) return;
+
+  const biasRng = new Rng(hashSeed(`${seedRaw}:founding:bias`));
+  // Pick which favored type to inject and which non-old-town slot to replace.
+  const targetType = biasRng.pick(chosenSite.favoredTypes);
+  const targetArch = DISTRICT_ARCHETYPES.find((a) => a.type === targetType);
+  if (!targetArch) return;
+
+  const swapIdx = districts.findIndex((d) => d.type !== 'old-town');
+  if (swapIdx === -1) return;
+
+  const original = districts[swapIdx];
+  // Rebuild the district with the favored type archetype, keeping position/radius.
+  const buildRng = new Rng(hashSeed(`buildings:${original.id}`));
+  const swapped: District = {
+    ...original,
+    type: targetArch.type,
+    visualStyle: { baseColor: targetArch.baseColor, accentColor: targetArch.accentColor },
+    buildings: generateBuildings(buildRng, targetArch, original.position, original.radius, original.id),
+  };
+  districts[swapIdx] = swapped;
+}
+
 // ----- Briefing -------------------------------------------------------------------------
 
 function generateBriefing(
@@ -722,6 +882,7 @@ function generateBriefing(
   quirks: CityQuirk[],
   factions: Faction[],
   risks: Risk[],
+  chosenSite?: FoundingSite,
 ): string {
   const opener = rng.pick(BRIEFING_OPENERS);
   const problem = rng.pick(BRIEFING_PROBLEMS);
@@ -736,5 +897,19 @@ function generateBriefing(
   ];
   if (risk) lines.push(`Also: ${risk.description}`);
   lines.push('Good luck, Mayor. The city is watching. Some of it literally.');
+  // Founding site line — pure lookup, no rng draws (stream position preserved).
+  if (chosenSite) {
+    const foundingLines: Record<string, string> = {
+      riverside:
+        'You laid the first stones by the water. The merchants are delighted; the fishermen are already arguing about docking rights.',
+      hilltop:
+        'You chose the hilltop. The nobles approve. The fishermen are filing a complaint.',
+      'forest edge':
+        "You founded the city at the forest's edge. The druids nodded once, which is practically a parade.",
+    };
+    // Match on the first word(s) of the vibe string.
+    const key = Object.keys(foundingLines).find((k) => chosenSite.vibe.startsWith(k));
+    if (key) lines.push(foundingLines[key]);
+  }
   return lines.join('\n\n');
 }

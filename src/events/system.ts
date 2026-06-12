@@ -13,6 +13,7 @@ import type {
 import type { Rng } from '../utils/rng';
 import { clampStat } from '../utils/math';
 import { ageAtLeast } from '../simulation/ages';
+import { EDICT_POOL } from '../simulation/data/edicts';
 
 // Event mechanics: condition checks, weighted selection, token resolution and
 // applying choice consequences. Event *content* lives in src/events/data.
@@ -66,7 +67,7 @@ export function eventIsEligible(def: GameEventDef, city: City): boolean {
   return conditionMet(def.condition, city);
 }
 
-/** Effective selection weight: base weight times any quirk tag biases. */
+/** Effective selection weight: base weight times any quirk and active-edict tag biases. */
 export function eventWeight(def: GameEventDef, city: City): number {
   let weight = def.weight;
   for (const quirk of city.quirks) {
@@ -74,6 +75,15 @@ export function eventWeight(def: GameEventDef, city: City): number {
     for (const tag of def.tags) {
       const bias = quirk.eventTagBias[tag];
       if (bias !== undefined) weight *= bias;
+    }
+  }
+  if (city.activeEdict) {
+    const edict = EDICT_POOL.find((e) => e.id === city.activeEdict);
+    if (edict?.eventTagBias) {
+      for (const tag of def.tags) {
+        const bias = edict.eventTagBias[tag];
+        if (bias !== undefined) weight *= bias;
+      }
     }
   }
   return weight;

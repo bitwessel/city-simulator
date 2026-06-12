@@ -5,6 +5,7 @@ import { MOOD_META, POPULATION_META, STAT_META } from './statMeta';
 import { formatCount, formatSigned, seasonFlavor, statTrend, trendArrow } from './format';
 import { CityVitals } from './CityVitals';
 import { FAVOR_CAP, getFavor } from '../projects/projects';
+import { Proclamations } from './Proclamations';
 
 interface VitalChipProps {
   icon: string;
@@ -71,7 +72,9 @@ function FavorChip({ city }: { city: City }) {
 
 export function TopBar({ city }: { city: City }) {
   const [vitalsOpen, setVitalsOpen] = useState(false);
+  const [edictsOpen, setEdictsOpen] = useState(false);
   const setPanelOpen = useGameStore((s) => s.setPanelOpen);
+  const declareEdict = useGameStore((s) => s.declareEdict);
   const mood = MOOD_META[city.mood];
   const season = seasonFlavor(city.day);
 
@@ -139,8 +142,18 @@ export function TopBar({ city }: { city: City }) {
           {mood.label}
         </span>
         <button
+          className={`vitals-toggle${edictsOpen ? ' vitals-toggle--open' : ''}`}
+          onClick={() => { setEdictsOpen((v) => !v); setVitalsOpen(false); }}
+          aria-expanded={edictsOpen}
+          title="Open Proclamations"
+        >
+          <span className="vitals-toggle__icon">📜</span>
+          <span className="vitals-toggle__label">Proclamations</span>
+          <span className="vitals-toggle__chev">{edictsOpen ? '▴' : '▾'}</span>
+        </button>
+        <button
           className={`vitals-toggle${vitalsOpen ? ' vitals-toggle--open' : ''}`}
-          onClick={() => setVitalsOpen((v) => !v)}
+          onClick={() => { setVitalsOpen((v) => !v); setEdictsOpen(false); }}
           aria-expanded={vitalsOpen}
           title="Open the full City Vitals"
         >
@@ -150,6 +163,13 @@ export function TopBar({ city }: { city: City }) {
         </button>
       </div>
 
+      {edictsOpen && (
+        <Proclamations
+          city={city}
+          onClose={() => setEdictsOpen(false)}
+          onDeclare={(id) => { declareEdict(id); setEdictsOpen(false); }}
+        />
+      )}
       {vitalsOpen && <CityVitals city={city} onClose={() => setVitalsOpen(false)} />}
     </header>
   );

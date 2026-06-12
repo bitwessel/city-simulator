@@ -1,0 +1,214 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`founding — default-path snapshot guard > default path is byte-identical across seeds (snapshot) > ember-42 1`] = `
+{
+  "districts": [
+    [
+      "old-town",
+      {
+        "x": 0,
+        "z": 0,
+      },
+    ],
+    [
+      "noble-hill",
+      {
+        "x": -6.036425175847029,
+        "z": 24.71613813406681,
+      },
+    ],
+    [
+      "garden",
+      {
+        "x": 19.847835541412774,
+        "z": -22.017306634304884,
+      },
+    ],
+    [
+      "forest-edge",
+      {
+        "x": -45.76488941211598,
+        "z": 7.160913799573187,
+      },
+    ],
+    [
+      "festival",
+      {
+        "x": -38.88780223217911,
+        "z": -26.081691155502895,
+      },
+    ],
+    [
+      "workers",
+      {
+        "x": -64.29393889633239,
+        "z": -10.53883039799964,
+      },
+    ],
+    [
+      "academy",
+      {
+        "x": -21.37592508933779,
+        "z": 51.30173782921205,
+      },
+    ],
+    [
+      "industrial",
+      {
+        "x": -11.469528210564686,
+        "z": -52.851351795766256,
+      },
+    ],
+  ],
+  "name": "Cinderhollow",
+  "quirks": [
+    "perpetual-festival",
+    "overzealous-gardens",
+    "dragon-bones",
+    "market-day-traffic",
+  ],
+  "stats": "{"happiness":60.8,"wealth":65.1,"chaos":53.4,"beauty":69.3,"pollution":54.6,"safety":47,"magic":50.6,"infrastructure":52.1,"food":50,"housing":52.2,"trust":48.2,"culture":61.8,"population":6813}",
+}
+`;
+
+exports[`founding — default-path snapshot guard > default path is byte-identical across seeds (snapshot) > invariant-17 1`] = `
+{
+  "districts": [
+    [
+      "old-town",
+      {
+        "x": 0,
+        "z": 0,
+      },
+    ],
+    [
+      "ruins",
+      {
+        "x": 29.17912940666703,
+        "z": 4.5324572329838455,
+      },
+    ],
+    [
+      "garden",
+      {
+        "x": -1.159283580492488,
+        "z": -31.65607475773142,
+      },
+    ],
+    [
+      "noble-hill",
+      {
+        "x": -43.00508681920002,
+        "z": -11.057197392899411,
+      },
+    ],
+    [
+      "festival",
+      {
+        "x": 26.233145425796113,
+        "z": 31.312606247199746,
+      },
+    ],
+    [
+      "magical",
+      {
+        "x": 56.63966019193347,
+        "z": 3.5182357667783757,
+      },
+    ],
+    [
+      "workers",
+      {
+        "x": 58.84475900171862,
+        "z": -22.263781771388228,
+      },
+    ],
+    [
+      "industrial",
+      {
+        "x": -52.156305500678144,
+        "z": -35.15972462190235,
+      },
+    ],
+  ],
+  "name": "Saltmere",
+  "quirks": [
+    "echoing-old-town",
+    "overzealous-gardens",
+    "political-sewers",
+    "migratory-monuments",
+  ],
+  "stats": "{"happiness":63.4,"wealth":57.5,"chaos":56.5,"beauty":52.4,"pollution":51,"safety":43.1,"magic":65.6,"infrastructure":51.1,"food":45,"housing":61,"trust":49.1,"culture":54.7,"population":7535}",
+}
+`;
+
+exports[`founding — default-path snapshot guard > default path is byte-identical across seeds (snapshot) > smoke-test-city 1`] = `
+{
+  "districts": [
+    [
+      "old-town",
+      {
+        "x": 0,
+        "z": 0,
+      },
+    ],
+    [
+      "ruins",
+      {
+        "x": 1.5155118983451161,
+        "z": -27.992872644783468,
+      },
+    ],
+    [
+      "magical",
+      {
+        "x": 27.095939626956365,
+        "z": 13.18994527123019,
+      },
+    ],
+    [
+      "harbor",
+      {
+        "x": -58.30540524775989,
+        "z": 22.731965196393293,
+      },
+    ],
+    [
+      "workers",
+      {
+        "x": 56.49241220206934,
+        "z": -1.5497544221791741,
+      },
+    ],
+    [
+      "garden",
+      {
+        "x": -55.463327612543196,
+        "z": -21.247455442798945,
+      },
+    ],
+    [
+      "industrial",
+      {
+        "x": 41.350516164244425,
+        "z": -41.54960613298188,
+      },
+    ],
+    [
+      "noble-hill",
+      {
+        "x": 20.78852973789471,
+        "z": 51.20517238410432,
+      },
+    ],
+  ],
+  "name": "Willowbell",
+  "quirks": [
+    "self-cleaning-streets",
+    "contagious-laughter",
+    "restless-cobblestones",
+    "lucky-cats",
+  ],
+  "stats": "{"happiness":56.2,"wealth":60.4,"chaos":51.3,"beauty":49,"pollution":65.3,"safety":48.1,"magic":63.9,"infrastructure":54.7,"food":48.8,"housing":54.5,"trust":55.4,"culture":61.7,"population":6143}",
+}
+`;
