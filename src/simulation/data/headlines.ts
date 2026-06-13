@@ -12,7 +12,7 @@ export const HEADLINE_POOL: HeadlineTemplate[] = [
     weight: 10,
   },
   {
-    text: 'Bakery in {district} unveils a bread so good two weddings were postponed.',
+    text: '{citizen} of {district} unveils a bread so good two weddings were postponed.',
     tone: 'good',
     weight: 10,
   },
@@ -27,7 +27,7 @@ export const HEADLINE_POOL: HeadlineTemplate[] = [
     weight: 9,
   },
   {
-    text: 'Lost umbrella reunited with owner after three years and one minor prophecy.',
+    text: '{citizen} is reunited with a lost umbrella after three years and one minor prophecy.',
     tone: 'good',
     weight: 8,
   },
@@ -52,7 +52,7 @@ export const HEADLINE_POOL: HeadlineTemplate[] = [
     weight: 8,
   },
   {
-    text: 'Child in {district} asks excellent question; entire council quietly reconsiders policy.',
+    text: '{citizen} of {district} asks an excellent question; the entire council quietly reconsiders policy.',
     tone: 'good',
     weight: 8,
   },
@@ -72,7 +72,7 @@ export const HEADLINE_POOL: HeadlineTemplate[] = [
     weight: 8,
   },
   {
-    text: 'Local cobbler repairs a boot so well it walks home by itself.',
+    text: '{citizen} repairs a boot so well it walks home by itself.',
     tone: 'good',
     weight: 8,
   },
@@ -112,7 +112,7 @@ export const HEADLINE_POOL: HeadlineTemplate[] = [
     weight: 8,
   },
   {
-    text: 'Someone in {district} has been leaving soup on doorsteps. Investigations have been quietly abandoned.',
+    text: '{citizen} is strongly suspected of leaving soup on doorsteps across {district}. Investigations have been quietly abandoned.',
     tone: 'good',
     weight: 8,
   },

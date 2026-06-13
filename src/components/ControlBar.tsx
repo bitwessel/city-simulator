@@ -1,5 +1,6 @@
 import { useEffect, type CSSProperties } from 'react';
 import { SPEED_OPTIONS, useGameStore, type SpeedIndex } from '../state/store';
+import '../styles/postcard.css';
 
 // Glyph + title for each play speed (0 = paused, handled separately).
 const SPEED_LABELS: Record<1 | 2 | 3, string> = {
@@ -30,6 +31,7 @@ export function ControlBar() {
   const eventOpen = useGameStore((s) => s.eventOpen);
   const day = useGameStore((s) => s.city?.day ?? 0);
   const hasOutcome = useGameStore((s) => s.city?.outcome != null);
+  const setPhotoMode = useGameStore((s) => s.setPhotoMode);
 
   // Blocked while the memo modal is open or the run has ended (clock is held
   // too). A memo merely waiting in the notification tray does not block play.
@@ -123,6 +125,18 @@ export function ControlBar() {
               : `${SPEED_OPTIONS[speed]}/sec`}
         </span>
       </div>
+
+      <div className="ctrl-sep" />
+
+      <button
+        className="ctrl-btn ctrl-btn--camera"
+        onClick={() => setPhotoMode(true)}
+        title="Enter photo mode — hide UI and capture a postcard"
+        aria-label="Photo mode"
+        data-testid="photo-mode-btn"
+      >
+        📷
+      </button>
     </div>
   );
 }

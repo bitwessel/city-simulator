@@ -31,6 +31,21 @@ export interface GameStore {
   selectedDistrictId: string | null;
   selectedFactionId: string | null;
   /**
+   * Phase 06 — the notable citizen whose bio card is open (null = none). Pure
+   * UI state; never part of City. The renderer/panel set this on click.
+   */
+  selectedCastId: string | null;
+  /**
+   * Phase 06 — the notable citizen the camera is following at street level
+   * (null = orbit). Pure renderer/UI state; zero simulation impact.
+   */
+  followedCastId: string | null;
+  /**
+   * Phase 06 — postcard/photo mode: hides UI chrome so the player can frame and
+   * capture the diorama. Pure UI state.
+   */
+  photoMode: boolean;
+  /**
    * Mobile only: whether the city/districts/factions panel popup is open. On
    * desktop the panel is always docked, so this flag is ignored there.
    */
@@ -62,6 +77,12 @@ export interface GameStore {
   declareEdict: (edictId: string | null) => void;
   selectDistrict: (id: string | null) => void;
   selectFaction: (id: string | null) => void;
+  /** Phase 06: open (or close, with null) a notable citizen's bio card. */
+  selectCast: (id: string | null) => void;
+  /** Phase 06: follow (or release, with null) a notable citizen with the camera. */
+  followCast: (id: string | null) => void;
+  /** Phase 06: toggle postcard/photo mode (hides UI for framing a shot). */
+  setPhotoMode: (on: boolean) => void;
   /** Mobile only: open/close the panel popup. */
   setPanelOpen: (open: boolean) => void;
   dismissOutcome: () => void;
@@ -76,6 +97,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
   eventOpen: false,
   selectedDistrictId: null,
   selectedFactionId: null,
+  selectedCastId: null,
+  followedCastId: null,
+  photoMode: false,
   panelOpen: false,
   runId: 0,
   pendingSeed: null,
@@ -92,6 +116,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
       eventOpen: false,
       selectedDistrictId: null,
       selectedFactionId: null,
+      selectedCastId: null,
+      followedCastId: null,
+      photoMode: false,
       panelOpen: false,
       runId: s.runId + 1,
     }));
@@ -116,6 +143,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
       eventOpen: false,
       selectedDistrictId: null,
       selectedFactionId: null,
+      selectedCastId: null,
+      followedCastId: null,
+      photoMode: false,
       panelOpen: false,
       pendingSeed: null,
       runId: s.runId + 1,
@@ -195,6 +225,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
       panelOpen: id ? true : get().panelOpen,
     }),
 
+  selectCast: (id) =>
+    set({
+      selectedCastId: id,
+      // Opening a bio card pops the panel on mobile, like district/faction.
+      panelOpen: id ? true : get().panelOpen,
+    }),
+
+  followCast: (id) => set({ followedCastId: id }),
+
+  setPhotoMode: (on) => set({ photoMode: on }),
+
   setPanelOpen: (open) => set({ panelOpen: open }),
 
   dismissOutcome: () => set({ screen: 'outcome' }),
@@ -207,6 +248,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
       eventOpen: false,
       selectedDistrictId: null,
       selectedFactionId: null,
+      selectedCastId: null,
+      followedCastId: null,
+      photoMode: false,
       panelOpen: false,
       speed: 2,
     }),

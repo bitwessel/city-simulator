@@ -39,6 +39,13 @@ export interface AgentState {
   phase: number;
   /** One-time cough timer for polluted mood (sim seconds), -1 = not coughing. */
   coughUntil: number;
+  /**
+   * Cached terrain ground height at the agent's last sampled position. The
+   * caller resamples this only every few frames (terrain is smooth and agents
+   * walk slowly), so the expensive `terrainHeightAt` river-distance scan runs
+   * for a fraction of the crowd each frame. NaN until first sampled.
+   */
+  groundY: number;
 }
 
 /** Output pose for one agent, filled by stepAgent (reused, no alloc). */
@@ -86,6 +93,7 @@ export function makeInitialState(spec: CitizenSpec): AgentState {
     nextEmote: -1, // scheduled relative to `now` on the first step
     phase,
     coughUntil: -1,
+    groundY: NaN, // sampled on the first step
   };
 }
 

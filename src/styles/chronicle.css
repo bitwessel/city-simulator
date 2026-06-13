@@ -1,0 +1,278 @@
+/* ===========================================================================
+   Chronicle tab — the city's auto-written storybook, shown in the left panel.
+   A vertical timeline spine with warm parchment entries, one per milestone.
+   =========================================================================== */
+
+/* ---------- Timeline container ---------- */
+
+.ctab {
+  padding: var(--mm-sp-3) 0 var(--mm-sp-4);
+}
+
+.ctab__empty {
+  padding: var(--mm-sp-5) var(--mm-sp-4);
+  text-align: center;
+  font-family: var(--mm-serif);
+  font-style: italic;
+  font-size: var(--mm-fs-md);
+  color: var(--mm-ink-soft);
+  line-height: 1.55;
+}
+
+.ctab__empty-glyph {
+  font-size: 2.4rem;
+  display: block;
+  margin-bottom: var(--mm-sp-3);
+  opacity: 0.55;
+}
+
+/* ---------- Timeline spine ---------- */
+
+.ctab__timeline {
+  position: relative;
+  padding: 0 var(--mm-sp-4);
+  list-style: none;
+  margin: 0;
+}
+
+/* The vertical spine line */
+.ctab__timeline::before {
+  content: '';
+  position: absolute;
+  left: calc(var(--mm-sp-4) + 16px);
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    rgba(120, 92, 56, 0.32) 6%,
+    rgba(120, 92, 56, 0.32) 94%,
+    transparent
+  );
+  border-radius: 2px;
+}
+
+/* ---------- Individual entry ---------- */
+
+.ctab__entry {
+  position: relative;
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  grid-template-rows: auto auto auto;
+  column-gap: var(--mm-sp-3);
+  padding-bottom: var(--mm-sp-4);
+  animation: mm-slide-left 0.3s var(--mm-ease) both;
+}
+
+/* The kind glyph / icon bubble on the spine */
+.ctab__kind-icon {
+  grid-column: 1;
+  grid-row: 1 / 4;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+  border: 2px solid;
+  margin-top: 2px;
+}
+
+/* Per-kind colour themes */
+.ctab__entry--founding  .ctab__kind-icon { background: #fef3d0; border-color: #c2913c; }
+.ctab__entry--age-up    .ctab__kind-icon { background: #f0e8fd; border-color: #8a52c0; }
+.ctab__entry--district  .ctab__kind-icon { background: #e8f5e9; border-color: #5fa771; }
+.ctab__entry--disaster  .ctab__kind-icon { background: #fde8e4; border-color: #d2735c; }
+.ctab__entry--project   .ctab__kind-icon { background: #e4eff8; border-color: #6fa3c7; }
+.ctab__entry--edict     .ctab__kind-icon { background: #fdf5e4; border-color: #c2913c; }
+.ctab__entry--event     .ctab__kind-icon { background: #f3ede4; border-color: #9a886e; }
+.ctab__entry--ending    .ctab__kind-icon { background: #fef3d0; border-color: #b9821f; }
+
+/* Day badge */
+.ctab__day {
+  grid-column: 2;
+  grid-row: 1;
+  font-size: var(--mm-fs-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--mm-ink-faint);
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 1px;
+}
+
+/* Entry title */
+.ctab__title {
+  grid-column: 2;
+  grid-row: 2;
+  font-family: var(--mm-serif);
+  font-size: var(--mm-fs-md);
+  font-weight: 700;
+  color: var(--mm-parchment-ink);
+  line-height: 1.2;
+  margin: 0 0 3px;
+}
+
+/* Entry body text */
+.ctab__text {
+  grid-column: 2;
+  grid-row: 3;
+  font-size: var(--mm-fs-base);
+  color: var(--mm-ink-soft);
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Optional reference tag (district or citizen) */
+.ctab__ref {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: var(--mm-fs-xs);
+  color: var(--mm-ink-faint);
+  letter-spacing: 0.04em;
+}
+
+/* ---------- Mini sparkline (optional SVG decoration) ---------- */
+
+.ctab__sparkline {
+  grid-column: 2;
+  grid-row: 4;
+  margin-top: var(--mm-sp-2);
+  height: 28px;
+  opacity: 0.65;
+}
+
+/* ---------- Outcome-screen chronicle embed ---------- */
+
+/* A compact timeline for the run epitaph on OutcomeScreen */
+.oc-chronicle {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.oc-chronicle__entry {
+  display: flex;
+  gap: var(--mm-sp-2);
+  align-items: flex-start;
+  padding: var(--mm-sp-2) 0;
+  border-bottom: 1px solid rgba(120, 92, 56, 0.12);
+}
+.oc-chronicle__entry:last-child {
+  border-bottom: none;
+}
+
+.oc-chronicle__icon {
+  flex-shrink: 0;
+  font-size: 1.1rem;
+  width: 24px;
+  text-align: center;
+  padding-top: 2px;
+}
+
+.oc-chronicle__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.oc-chronicle__title {
+  font-family: var(--mm-serif);
+  font-size: var(--mm-fs-base);
+  font-weight: 700;
+  color: var(--mm-parchment-ink);
+  line-height: 1.2;
+}
+
+.oc-chronicle__day {
+  font-size: var(--mm-fs-xs);
+  color: var(--mm-ink-faint);
+  font-variant-numeric: tabular-nums;
+  margin-left: 6px;
+  letter-spacing: 0.04em;
+}
+
+.oc-chronicle__text {
+  font-size: var(--mm-fs-sm);
+  color: var(--mm-ink-soft);
+  line-height: 1.45;
+  margin-top: 2px;
+}
+
+/* Show-all toggle button inside the outcome scroll */
+.oc-chronicle__toggle {
+  display: block;
+  width: 100%;
+  margin-top: var(--mm-sp-2);
+  background: none;
+  border: 1px dashed rgba(120, 92, 56, 0.35);
+  border-radius: var(--mm-radius-xs);
+  padding: 6px 12px;
+  font-family: var(--mm-body);
+  font-size: var(--mm-fs-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--mm-ink-faint);
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.oc-chronicle__toggle:hover {
+  border-color: var(--mm-brass);
+  color: var(--mm-ink-soft);
+}
+
+/* Seed copy button */
+.oc-seed {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--mm-sp-2);
+  flex-wrap: wrap;
+  margin: 16px 0 24px;
+}
+
+.oc-seed__label {
+  font-size: var(--mm-fs-sm);
+  color: var(--mm-parchment-ink-soft);
+}
+
+.oc-seed__code {
+  font-family: 'Courier New', monospace;
+  background: rgba(110, 79, 51, 0.14);
+  border: 1px dashed rgba(110, 79, 51, 0.4);
+  padding: 2px 8px;
+  border-radius: 6px;
+  color: #6e4f33;
+  letter-spacing: 0.03em;
+  font-size: var(--mm-fs-sm);
+  user-select: all;
+}
+
+.oc-seed__copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: 1px solid rgba(120, 92, 56, 0.35);
+  border-radius: var(--mm-radius-xs);
+  padding: 3px 10px;
+  font-family: var(--mm-body);
+  font-size: var(--mm-fs-xs);
+  color: var(--mm-ink-faint);
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+  white-space: nowrap;
+}
+.oc-seed__copy:hover {
+  border-color: var(--mm-brass);
+  color: var(--mm-ink);
+  background: rgba(194, 145, 60, 0.08);
+}
+.oc-seed__copy--copied {
+  border-color: var(--mm-good);
+  color: var(--mm-good-ink);
+  background: rgba(95, 167, 113, 0.1);
+}

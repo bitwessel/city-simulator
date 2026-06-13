@@ -3,6 +3,7 @@ import type { City } from '../types';
 import { RISK_META } from './statMeta';
 import { Meter } from './Meter';
 import { formatCount } from './format';
+import { NotableCitizensList } from './NotableCitizensList';
 
 function riskColor(level: number): string {
   if (level >= 60) return 'var(--mm-bad)';
@@ -54,6 +55,15 @@ export function CityTab({ city }: { city: City }) {
             </div>
           ))
         )}
+      </section>
+
+      <section className="section">
+        <h3 className="section__title">Notable Citizens</h3>
+        <NotableCitizensList
+          citizens={city.cast ?? []}
+          districts={city.districts}
+          emptyNote="No one has made a name for themselves yet."
+        />
       </section>
 
       <section className="section">

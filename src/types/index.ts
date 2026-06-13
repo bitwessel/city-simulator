@@ -324,6 +324,75 @@ export interface CitizenGroup {
   districtId: string;
 }
 
+// ----- Notable citizens (phase 06) -------------------------------------------
+
+/**
+ * A named member of the city's small cast (~6-10), generated deterministically
+ * from `hash(seed + ':cast')` and stored on the city. They surface in the text
+ * layer via the `{citizen}` token, and the renderer binds each to a citizen
+ * instance in their home district so they're findable in the world. Plain
+ * serializable data — UI-free, no functions.
+ */
+export interface NotableCitizen {
+  id: string;
+  /** Display name, e.g. 'Marta Quill'. */
+  name: string;
+  /** Drawn from the home district's `CitizenGroup` archetypes ('stall keepers'). */
+  archetype: string;
+  /** One short, warm, slightly-funny personality line. */
+  personality: string;
+  /** The district this citizen calls home. */
+  homeDistrictId: string;
+}
+
+// ----- The Chronicle (phase 06) ----------------------------------------------
+
+/** Category of a chronicle entry — drives the timeline's icon/colour. */
+export type ChronicleKind =
+  | 'founding'
+  | 'age-up'
+  | 'district'
+  | 'disaster'
+  | 'project'
+  | 'edict'
+  | 'event'
+  | 'ending';
+
+/**
+ * One entry in the city's auto-written storybook. Plain serializable data,
+ * appended by the engine (and player-action flows) from already-decided facts —
+ * writing an entry never draws RNG. References are denormalized names/ids so the
+ * timeline can render and link without re-deriving them.
+ */
+export interface ChronicleEntry {
+  day: number;
+  /** Short headline, e.g. 'The Village Age'. */
+  title: string;
+  /** One or two sentences in the game's warm, slightly-funny voice. */
+  text: string;
+  kind: ChronicleKind;
+  /** Denormalized references for the timeline (all optional). */
+  districtId?: string;
+  districtName?: string;
+  citizenId?: string;
+  citizenName?: string;
+}
+
+/**
+ * Remembers which cast member the `{citizen}` token resolved to within an event
+ * chain, so a follow-up or chain text reuses the same name ("Marta the baker,
+ * who you may remember from the bread incident"). Keyed by the originating
+ * event's def id. Plain data on the city so replays reproduce the casting.
+ */
+export interface CitizenInvolvement {
+  /** The event def id the citizen was first cast into. */
+  defId: string;
+  /** The notable citizen's id (resolved name lives in the cast). */
+  citizenId: string;
+  /** The day they were first involved. */
+  day: number;
+}
+
 export type FactionArchetype =
   | 'merchants'
   | 'gardeners'
@@ -767,6 +836,22 @@ export interface City {
   edictLog?: EdictOrder[];
   /** The founding choices made during the ritual; absent on default-path runs. */
   founding?: FoundingChoices;
+  /**
+   * The named cast (phase 06) — generated from `hash(seed + ':cast')` and grown
+   * by mid-run district foundings. Optional so older states load cleanly.
+   */
+  cast?: NotableCitizen[];
+  /**
+   * The city's auto-written chronicle (phase 06), oldest first. Appended by the
+   * engine and player-action flows from already-decided facts (no RNG).
+   */
+  chronicle?: ChronicleEntry[];
+  /**
+   * Which cast member the `{citizen}` token last resolved to, per originating
+   * event def id — so follow-up/chain texts reuse the same name. Plain data so
+   * replays reproduce the casting exactly.
+   */
+  citizenInvolvements?: CitizenInvolvement[];
 }
 
 // ----- Engine results -----------------------------------------------------------------------

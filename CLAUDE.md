@@ -9,11 +9,12 @@ Feature work follows the phase specs in `prompts/` (build order and an index are
 
 ## Where the project is
 
-- **Phases 01–05 — shipped:** living-world graphics + day/night, relaxed balance,
+- **Phases 01–06 — shipped:** living-world graphics + day/night, relaxed balance,
   mayor projects, ages & progression (five ages, era skins, age bar, the wonder arc),
-  edicts & founding (standing edicts with prop layers, the founding ritual).
-- **Phase 06 — next:** citizens & chronicle. Spec: `prompts/06-citizens-and-chronicle.md`.
-- **Phases 07–08 — not started:** worldsmith pipeline & session.
+  edicts & founding (standing edicts with prop layers, the founding ritual), and
+  citizens & chronicle (named cast in the world + panel, click-to-meet bio cards,
+  street-level Follow camera, the auto-written chronicle timeline, postcard photo mode).
+- **Phases 07–08 — next:** worldsmith pipeline & session.
 
 The roadmap table in `00-vision.md` is the source of truth for build order and rationale.
 
@@ -68,6 +69,14 @@ node scripts/edict-check.mjs [seed]   # phase 05: declares all five edicts throu
                                   #   lifted-edict control shot — LOOK at them
 node scripts/founding-check.mjs [seed]     # phase 05: founding ritual with real choices
                                   #   (site/patron/name); asserts the briefing reacts
+node scripts/citizen-check.mjs [seed] # phase 06: notable-citizen roster + bio card,
+                                  #   3D click (dev-only window.__mmCitizens bridge),
+                                  #   street-level Follow + clean Esc release, chronicle
+                                  #   tab fills — screenshots each step, LOOK at them
+node scripts/postcard-check.mjs [seed] [--headed]  # phase 06: photo mode hides the HUD,
+                                  #   captures a non-black PNG whose color matches the
+                                  #   on-screen tone-mapped look (--headed for the real
+                                  #   GPU path; headless SwiftShader tone-maps anyway)
 node scripts/fps-probe.mjs [seed] [?nofx]  # headed FPS probe — headless = SwiftShader,
                                   #   ~1fps and useless; PostFX auto-degrades, sample
                                   #   early AND late. `?nofx` disables the post chain.

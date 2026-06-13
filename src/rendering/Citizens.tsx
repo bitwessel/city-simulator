@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, type ThreeEvent } from '@react-three/fiber';
 import { Color, Object3D, type InstancedMesh } from 'three';
 import type { City } from '../types';
+import type { CastPositions } from './castFollow';
 import { buildSpecs, type CartSpec, type CitizenSpec, type Vec2 } from './citizens/specs';
 import {
   makeInitialState,
@@ -39,6 +40,12 @@ import { EmoteSprites, type EmotePool } from './citizens/Emotes';
 // src/rendering/citizens/* (spec builder, agent/cart runtime, emote pool).
 // ---------------------------------------------------------------------------
 
+/** Resample each agent's terrain ground height every Nth frame (staggered by
+ *  index). Terrain is smooth and agents walk ~1 unit/sec, so a height that's a
+ *  few frames stale leaves a sub-pixel gap — invisible — while cutting the
+ *  per-frame terrain scans to ~1/N of the crowd. */
+const GROUND_REFRESH = 4;
+
 /** Hat geometries we draw as separate instanced meshes (uniform per mesh). */
 const HAT_KINDS: Hat[] = ['wizard', 'scholar', 'watch', 'sunhat'];
 /** Prop kinds drawn as separate instanced meshes; only carried ones render. */
@@ -60,6 +67,8 @@ interface BufferLayout {
   propIndices: Record<PropKind, number[]>;
   /** Resolved group membership: groupKey -> member spec indices. */
   groups: Map<string, number[]>;
+  /** Phase 06: spec indices of bound cast members, paired with their castId. */
+  castIndices: { i: number; castId: string }[];
   /** A signature that changes only when instance counts change (for remount). */
   countKey: string;
 }
@@ -71,11 +80,12 @@ function emptyPropIndices(): Record<PropKind, number[]> {
   return { none: [], crate: [], sack: [], rod: [], staff: [] };
 }
 
-function layoutBuffers(city: City): BufferLayout {
-  const { citizens, carts } = buildSpecs(city);
+function layoutBuffers(city: City, quality: number): BufferLayout {
+  const { citizens, carts } = buildSpecs(city, quality);
   const hatIndices = emptyHatIndices();
   const propIndices = emptyPropIndices();
   const groups = new Map<string, number[]>();
+  const castIndices: { i: number; castId: string }[] = [];
 
   citizens.forEach((spec, i) => {
     if (spec.hat !== 'none') hatIndices[spec.hat].push(i);
@@ -85,21 +95,37 @@ function layoutBuffers(city: City): BufferLayout {
       if (arr) arr.push(i);
       else groups.set(spec.group, [i]);
     }
+    if (spec.castId) castIndices.push({ i, castId: spec.castId });
   });
 
   const countKey = [
     citizens.length,
     carts.length,
+    castIndices.length,
     ...HAT_KINDS.map((h) => hatIndices[h].length),
     ...PROP_KINDS.map((p) => propIndices[p].length),
   ].join('-');
 
-  return { citizens, carts, hatIndices, propIndices, groups, countKey };
+  return { citizens, carts, hatIndices, propIndices, groups, castIndices, countKey };
 }
 
-export function Citizens({ city }: { city: City }) {
+export interface CitizensProps {
+  city: City;
+  /** Phase 06: shared registry the follow camera reads cast positions from. */
+  castPositions?: CastPositions;
+  /** Phase 06: open a cast member's bio card (raycast pick in the crowd). */
+  onSelectCast?: (id: string) => void;
+  /** 0..1 crowd-density factor from the adaptive perf governor (default 1). */
+  quality?: number;
+}
+
+export function Citizens({ city, castPositions, onSelectCast, quality = 1 }: CitizensProps) {
   const bodyRef = useRef<InstancedMesh>(null);
   const headRef = useRef<InstancedMesh>(null);
+  // Phase 06: a golden pip floats over each bound cast member (the findable
+  // marker); a slightly larger invisible sphere catches clicks for picking.
+  const castMarkRef = useRef<InstancedMesh>(null);
+  const castPickRef = useRef<InstancedMesh>(null);
   const hatRefs = useRef<Record<Hat, InstancedMesh | null>>({
     none: null,
     wizard: null,
@@ -122,11 +148,16 @@ export function Citizens({ city }: { city: City }) {
   const agentsRef = useRef(new Map<string, AgentState>());
   const cartsRef = useRef(new Map<string, CartState>());
   const dummy = useMemo(() => new Object3D(), []);
+  // Rendered-frame counter: spreads the per-citizen terrain-height resample
+  // across GROUND_REFRESH frames so only ~1/4 of the crowd scans the terrain
+  // each frame instead of all of them (terrainHeightAt walks the river polyline).
+  const frameRef = useRef(0);
 
   // Day ticks hand us a fresh city; rebuilding this layout is cheap. Runtime
-  // walking state survives in agentsRef/cartsRef, keyed by stable ids.
-  const layout = useMemo(() => layoutBuffers(city), [city]);
-  const { citizens, carts, hatIndices, propIndices, groups, countKey } = layout;
+  // walking state survives in agentsRef/cartsRef, keyed by stable ids. The
+  // density factor re-lays the crowd only when the governor steps it.
+  const layout = useMemo(() => layoutBuffers(city, quality), [city, quality]);
+  const { citizens, carts, hatIndices, propIndices, groups, castIndices, countKey } = layout;
 
   // Scratch buffers reused every frame — zero per-frame allocation in the loop.
   const pose = useMemo<AgentPose>(
@@ -154,7 +185,16 @@ export function Citizens({ city }: { city: City }) {
     for (const id of cartsRef.current.keys()) {
       if (!liveCarts.has(id)) cartsRef.current.delete(id);
     }
-  }, [citizens, carts]);
+
+    // Phase 06: drop stale cast positions so a culled / restarted run doesn't
+    // leave the follow camera chasing a ghost.
+    if (castPositions) {
+      const liveCast = new Set(citizens.map((s) => s.castId).filter(Boolean) as string[]);
+      for (const id of castPositions.keys()) {
+        if (!liveCast.has(id)) castPositions.delete(id);
+      }
+    }
+  }, [citizens, carts, castPositions]);
 
   // Per-citizen colors (body coat + skin), assigned once per mesh incarnation.
   useEffect(() => {
@@ -190,6 +230,7 @@ export function Citizens({ city }: { city: City }) {
     if (!body || !head) return;
     const now = state.clock.elapsedTime;
     const dt = Math.min(delta, 0.1); // tab-switch hiccups shouldn't teleport anyone
+    const frameNo = ++frameRef.current;
 
     const mods: CrowdMods = {
       speedMul: moodSpeedMultiplier(city.mood),
@@ -239,7 +280,12 @@ export function Citizens({ city }: { city: City }) {
       const gc = spec.group ? groupCenters.get(spec.group) ?? null : null;
       stepAgent(spec, agent, now, dt, mods, pose, gc);
       // Stand on the land: the runtime is pure 2D, the terrain owns height.
-      pose.y = terrainHeightAt(city.terrain, pose.x, pose.z);
+      // Resample only every GROUND_REFRESH frames (staggered by index); reuse
+      // the cached height in between — see GROUND_REFRESH.
+      if (!Number.isFinite(agent.groundY) || (i + frameNo) % GROUND_REFRESH === 0) {
+        agent.groundY = terrainHeightAt(city.terrain, pose.x, pose.z);
+      }
+      pose.y = agent.groundY;
 
       const baseY = pose.y + (BODY_HEIGHT / 2) * spec.scale - pose.sit;
       const y = baseY + pose.bob;
@@ -309,6 +355,62 @@ export function Citizens({ city }: { city: City }) {
         mesh.setMatrixAt(j, dummy.matrix);
       }
       mesh.instanceMatrix.needsUpdate = true;
+    }
+
+    // ----- Pass 4b: cast markers + pick volumes + position registry ----------
+    // Each bound cast member gets a small golden pip bobbing above the head
+    // (findable in the crowd) and a larger invisible sphere for click-picking.
+    // Their live world position is published to the shared registry so the
+    // follow camera can chase them without any store round-trip.
+    const mark = castMarkRef.current;
+    const pick = castPickRef.current;
+    for (let j = 0; j < castIndices.length; j++) {
+      const { i, castId } = castIndices[j];
+      const spec = citizens[i];
+      const slot = buf[i];
+      if (!spec || !slot) continue;
+      const headY = slot.y + (BODY_HEIGHT + 0.1) * spec.scale - slot.sit + slot.bob;
+
+      // Publish position (registry value reused in place — no per-frame alloc).
+      if (castPositions) {
+        let p = castPositions.get(castId);
+        if (!p) {
+          p = { x: 0, y: 0, z: 0 };
+          castPositions.set(castId, p);
+        }
+        p.x = slot.x;
+        p.y = slot.y;
+        p.z = slot.z;
+      }
+
+      if (mark) {
+        // A little floating diamond pip, gently bobbing above the marker head.
+        const pipY = headY + (0.34 + Math.sin(now * 2.2 + i) * 0.05) * spec.scale;
+        dummy.position.set(slot.x, pipY, slot.z);
+        dummy.rotation.set(0, now * 1.4 + i, Math.PI / 4);
+        dummy.scale.set(spec.scale, spec.scale, spec.scale);
+        dummy.updateMatrix();
+        mark.setMatrixAt(j, dummy.matrix);
+      }
+      if (pick) {
+        // Generous invisible click target centered on the body.
+        dummy.position.set(slot.x, slot.y + 0.4 * spec.scale + slot.bob, slot.z);
+        dummy.rotation.set(0, 0, 0);
+        dummy.scale.set(spec.scale, spec.scale, spec.scale);
+        dummy.updateMatrix();
+        pick.setMatrixAt(j, dummy.matrix);
+      }
+    }
+    if (mark) mark.instanceMatrix.needsUpdate = true;
+    if (pick) {
+      pick.instanceMatrix.needsUpdate = true;
+      // The pick instances move every frame as the cast walk their routes.
+      // three.js caches the InstancedMesh-level bounding sphere on first
+      // raycast and never refreshes it, so a stale sphere makes the whole
+      // mesh fail the raycaster's early-out and the cast become un-clickable.
+      // Invalidate it each frame; three.js recomputes lazily on the next
+      // raycast (a click or hover), reading the current instance matrices.
+      pick.boundingSphere = null;
     }
 
     // ----- Pass 5: carts (body + 4 wheels + draft animal) --------------------
@@ -402,6 +504,57 @@ export function Citizens({ city }: { city: City }) {
           >
             <sphereGeometry args={[0.13, 10, 8]} />
             <meshStandardMaterial roughness={0.85} metalness={0} />
+          </instancedMesh>
+        </>
+      )}
+
+      {/* Phase 06 — cast markers: a glowing golden pip over each bound named
+          citizen, plus an invisible, generously sized sphere that catches the
+          click and maps the instanceId back to its castId. */}
+      {castIndices.length > 0 && (
+        <>
+          <instancedMesh
+            ref={castMarkRef}
+            args={[undefined, undefined, castIndices.length]}
+            raycast={() => null}
+            frustumCulled={false}
+          >
+            <octahedronGeometry args={[0.12, 0]} />
+            <meshStandardMaterial
+              color="#ffe08a"
+              emissive="#ffcf4d"
+              emissiveIntensity={1.6}
+              toneMapped={false}
+              roughness={0.4}
+              metalness={0.1}
+            />
+          </instancedMesh>
+          <instancedMesh
+            ref={castPickRef}
+            args={[undefined, undefined, castIndices.length]}
+            frustumCulled={false}
+            // The districts' invisible picking cylinders check this flag and
+            // yield the click when the same ray also hit a citizen (an
+            // invisible occluder must not steal a click from a visible one).
+            userData={{ castPick: true }}
+            onPointerOver={(e: ThreeEvent<PointerEvent>) => {
+              e.stopPropagation();
+              document.body.style.cursor = 'pointer';
+            }}
+            onPointerOut={(e: ThreeEvent<PointerEvent>) => {
+              e.stopPropagation();
+              document.body.style.cursor = 'auto';
+            }}
+            onClick={(e: ThreeEvent<MouseEvent>) => {
+              if (e.instanceId == null) return;
+              const hit = castIndices[e.instanceId];
+              if (!hit) return;
+              e.stopPropagation();
+              onSelectCast?.(hit.castId);
+            }}
+          >
+            <sphereGeometry args={[0.5, 8, 6]} />
+            <meshBasicMaterial transparent opacity={0} depthWrite={false} />
           </instancedMesh>
         </>
       )}

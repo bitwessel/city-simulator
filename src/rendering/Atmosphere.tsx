@@ -384,10 +384,49 @@ function MagicSparkles({ magic, extent }: SparklesProps) {
 
 // ----- Lights (day/night driven, with arcane pulse) -------------------------
 
-function MoodLights({ mood, theme }: { mood: CityMood; theme: MoodTheme }) {
+function MoodLights({
+  mood,
+  theme,
+  center,
+  extent,
+}: {
+  mood: CityMood;
+  theme: MoodTheme;
+  center: { x: number; z: number };
+  extent: number;
+}) {
   const sunRef = useRef<DirectionalLight>(null);
   const fillRef = useRef<DirectionalLight>(null);
   const hemiRef = useRef<HemisphereLight>(null);
+
+  // The sun aims at the city center (the layout spirals off-origin), so the
+  // shadow frustum can hug the actual city instead of a loose origin-centered
+  // box. A tighter box packs more shadow texels onto the buildings — sharper
+  // shadows from a cheaper 1024² map than the old loose 2048² one.
+  const target = useMemo(() => {
+    const o = new Obj3D();
+    o.position.set(center.x, 0, center.z);
+    return o;
+  }, [center.x, center.z]);
+
+  // Distance the sun sits out from the center, and the ortho half-size that
+  // just wraps the city (+margin for shadows cast outward at low sun).
+  const dist = Math.max(120, extent * 2.4);
+  const half = Math.max(55, extent * 1.25);
+
+  // Re-fit the shadow camera when the framing changes (rare: founding events).
+  useEffect(() => {
+    const sun = sunRef.current;
+    if (!sun) return;
+    const cam = sun.shadow.camera;
+    cam.left = -half;
+    cam.right = half;
+    cam.top = half;
+    cam.bottom = -half;
+    cam.near = 1;
+    cam.far = dist * 2 + half;
+    cam.updateProjectionMatrix();
+  }, [half, dist]);
 
   // Every frame: copy the DAYLIGHT snapshot (theme already folded in by the
   // rig) onto the lights, then layer the mood pulses on the sun.
@@ -402,7 +441,13 @@ function MoodLights({ mood, theme }: { mood: CityMood; theme: MoodTheme }) {
 
     const sun = sunRef.current;
     if (sun) {
-      sun.position.copy(DAYLIGHT.sunDir).multiplyScalar(140);
+      // Sit above the city center (not the origin) along the sun direction so
+      // the tightened shadow frustum stays centered on the layout.
+      sun.position.set(
+        center.x + DAYLIGHT.sunDir.x * dist,
+        DAYLIGHT.sunDir.y * dist,
+        center.z + DAYLIGHT.sunDir.z * dist,
+      );
       sun.color.copy(DAYLIGHT.sunColor);
       sun.intensity = DAYLIGHT.sunIntensity * pulse;
     }
@@ -426,6 +471,8 @@ function MoodLights({ mood, theme }: { mood: CityMood; theme: MoodTheme }) {
 
   return (
     <>
+      {/* The sun's shadow target, parked at the city center. */}
+      <primitive object={target} />
       <hemisphereLight
         ref={hemiRef}
         color={theme.ambient}
@@ -434,20 +481,17 @@ function MoodLights({ mood, theme }: { mood: CityMood; theme: MoodTheme }) {
       />
       <directionalLight
         ref={sunRef}
+        target={target}
         color={theme.sun}
         intensity={theme.sunIntensity}
         position={theme.sunPosition}
         castShadow
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
+        // 1024² (down from 2048²) — a quarter of the texels to fill. The
+        // city-fit frustum above keeps texel density (sharpness) about the same.
+        shadow-mapSize-width={1024}
+        shadow-mapSize-height={1024}
         shadow-bias={-0.0004}
         shadow-radius={4}
-        shadow-camera-near={1}
-        shadow-camera-far={400}
-        shadow-camera-left={-140}
-        shadow-camera-right={140}
-        shadow-camera-top={140}
-        shadow-camera-bottom={-140}
       />
       {/* Cool fill from the opposite side keeps shadows from going pure black. */}
       <directionalLight
@@ -465,7 +509,7 @@ export function Atmosphere({ mood, stats, theme, extent, center }: AtmospherePro
   // changes don't remount the scene graph. Here we own the lights + effects.
   return (
     <>
-      <MoodLights mood={mood} theme={theme} />
+      <MoodLights mood={mood} theme={theme} center={center} extent={extent} />
       <SunGlow theme={theme} extent={extent} />
       <group position={[center.x, 0, center.z]}>
         <Clouds theme={theme} extent={extent} />

@@ -11,7 +11,7 @@
 // moment-to-moment state in refs keyed by these stable ids.
 // ---------------------------------------------------------------------------
 
-import type { Building, City, District, TerrainData } from '../../types';
+import type { Building, City, District, NotableCitizen, TerrainData } from '../../types';
 import { hashFloat } from '../hash';
 import { riverDirectionFrom } from '../../generation/terrain';
 import { roadCurve, type RoadCurve } from './bezier';
@@ -61,6 +61,13 @@ export interface CitizenSpec {
   scale: number;
   /** Base speed in world units / sec before mood scaling. */
   speed: number;
+  /**
+   * Phase 06 — when set, this instance IS a named cast member (the `id` of the
+   * matching `NotableCitizen`). The renderer gives it a distinctive marker so
+   * it's findable, maps raycast hits back to it, and the follow camera reads
+   * its world position. Pure renderer binding — zero simulation impact.
+   */
+  castId?: string;
 }
 
 /** A cart trundling a road ribbon, optionally with a draft-animal blob. */
@@ -325,13 +332,74 @@ function makePatrols(d: District, built: Building[], startIndex: number): Citize
   return out;
 }
 
-export function buildSpecs(city: City): CrowdSpecs {
-  const crowdMul = moodCrowdMultiplier(city.mood);
+/**
+ * Build the guaranteed instance for a named cast member (phase 06). It plays a
+ * natural, district-appropriate role (so it walks real routes and blends in),
+ * but carries `castId` so the renderer can mark it, raycast back to it, and the
+ * follow camera can read its position. Deterministic: a stable salt derived
+ * from the cast id seeds its role so two cast members in one district never
+ * collapse onto an identical look. Pure renderer binding — no simulation touch.
+ */
+function makeCastCitizen(
+  c: NotableCitizen,
+  d: District,
+  built: Building[],
+  marks: Building[],
+  terrain?: TerrainData,
+): CitizenSpec {
+  // A stable pseudo-index off the cast id keeps the role/wardrobe varied and
+  // collision-free without depending on the (fluctuating) crowd size.
+  const salt = 1 + Math.floor(hashFloat(c.id, 1) * 9973);
+  // Pass a neutral 'serene' mood: cast members keep a steady district role and
+  // never get swept into a transient festive/chaotic crowd-scene (a follow
+  // target that teleports into a dance orbit reads as a glitch).
+  const base = makeCitizen(d, built, marks, salt, 'serene', terrain);
+  // Named citizens read as adults: a 'kid' role at adult scale looks wrong, so
+  // promote it to an errand-runner (keeping a real walking route).
+  if (base.activity === 'kid') {
+    base.activity = 'errands';
+    base.group = undefined;
+  }
+  return {
+    ...base,
+    id: `castcit-${c.id}`,
+    districtId: d.id,
+    castId: c.id,
+    scale: Math.max(base.scale, 1) * 1.06, // a touch taller so they stand out
+  };
+}
+
+/**
+ * @param quality 0..1 crowd-density factor from the adaptive perf governor
+ *   (1 = full crowd). Scales both the per-district count and the global cap, so
+ *   a struggling GPU fields fewer townsfolk without changing anyone's role.
+ *   Cast members are still bound first, so thinning never drops a named citizen.
+ */
+export function buildSpecs(city: City, quality = 1): CrowdSpecs {
+  const crowdMul = moodCrowdMultiplier(city.mood) * quality;
   const citizens: CitizenSpec[] = [];
+
+  // Phase 06 — bind named cast members first so the proportional cap never
+  // drops them: a cast member must reliably exist whenever their home district
+  // does. Group them by home district to reuse each district's built roster.
+  const castByDistrict = new Map<string, NotableCitizen[]>();
+  for (const c of city.cast ?? []) {
+    const arr = castByDistrict.get(c.homeDistrictId);
+    if (arr) arr.push(c);
+    else castByDistrict.set(c.homeDistrictId, [c]);
+  }
 
   for (const d of city.districts) {
     const built = builtBuildings(d);
     const marks = landmarks(built);
+    // Guaranteed cast instances for this district (only when developed enough
+    // to field anyone at all — matches districtCount's floor so a brand-new
+    // district isn't a lone figure on bare ground).
+    if (d.development >= 5) {
+      for (const c of castByDistrict.get(d.id) ?? []) {
+        citizens.push(makeCastCitizen(c, d, built, marks, city.terrain));
+      }
+    }
     const n = districtCount(d, crowdMul);
     for (let i = 0; i < n; i++) {
       citizens.push(makeCitizen(d, built, marks, i, city.mood, city.terrain));
@@ -344,8 +412,11 @@ export function buildSpecs(city: City): CrowdSpecs {
 
   // Proportionally trim toward the target before the hard cap. We keep a stable
   // prefix so ids don't churn frame-to-frame; districts are already in a stable
-  // order, so a simple slice is deterministic.
-  const limited = citizens.slice(0, Math.min(MAX_CITIZENS, Math.max(TARGET_CITIZENS, 0) + 30));
+  // order, so a simple slice is deterministic. Cast instances are pushed at the
+  // head of each district's block, so the slice never strands a named citizen.
+  // The quality factor scales the cap too (≥1 cast member is always kept).
+  const cap = Math.round(Math.min(MAX_CITIZENS, Math.max(TARGET_CITIZENS, 0) + 30) * quality);
+  const limited = citizens.slice(0, Math.max(1, cap));
 
   // ----- Carts on the road ribbons -----------------------------------------
   const carts: CartSpec[] = [];

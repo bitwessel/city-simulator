@@ -11,6 +11,8 @@ import {
   nextDistrictPosition,
 } from '../generation/generator';
 import { addDistrictFlat } from '../generation/terrain';
+import { castExpansionRng, makeNotableCitizen, usedCastNames } from '../generation/cast';
+import { districtFoundedChronicleEntry, pushChronicle } from './chronicle';
 
 // ---------------------------------------------------------------------------
 // Mid-run city expansion. A thriving city periodically breaks ground on a
@@ -123,12 +125,34 @@ function foundDistrict(city: City, rng: Rng, headlines: NewsItem[]): void {
   // second road to its next-nearest for a small loop.
   connectNewDistrict(city, district, rng);
 
+  // A new district may add a face to the cast. Drawn from a DEDICATED
+  // `:cast:<day>` sub-stream so the expansion's own draws above (and thus
+  // expansion determinism) are untouched. Half the time the new quarter brings
+  // a notable resident; ids stay globally unique.
+  maybeAddCastMember(city, district);
+
   city.lastDistrictFoundedDay = city.day;
   headlines.push({
     day: city.day,
     text: rng.pick(FOUNDING_HEADLINES).replace('{district}', district.name),
     tone: 'good',
   });
+  pushChronicle(city, districtFoundedChronicleEntry(city, district));
+}
+
+/**
+ * Possibly add one notable citizen for a freshly-founded district. Uses its own
+ * `:cast:<day>` sub-stream (via castExpansionRng) so the existing expansion RNG
+ * sequence is never perturbed — expansion stays byte-for-byte deterministic.
+ */
+function maybeAddCastMember(city: City, district: City['districts'][number]): void {
+  const rng = castExpansionRng(city.seed.raw, city.day);
+  // Not every district produces a notable; the roll lives only in this stream.
+  if (!rng.chance(0.5)) return;
+  const used = usedCastNames(city);
+  const id = `cast-${city.day}-${(city.cast ?? []).length}`;
+  const member = makeNotableCitizen(rng, id, district, used);
+  city.cast = [...(city.cast ?? []), member];
 }
 
 /** Pick an archetype: prefer types not yet present, else allow a duplicate. */

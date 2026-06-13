@@ -7,10 +7,11 @@ import type {
   EventCondition,
   GameEventDef,
   NewsItem,
+  NotableCitizen,
   StatDelta,
   StatKey,
 } from '../types';
-import type { Rng } from '../utils/rng';
+import { Rng, hashSeed } from '../utils/rng';
 import { clampStat } from '../utils/math';
 import { ageAtLeast } from '../simulation/ages';
 import { EDICT_POOL } from '../simulation/data/edicts';
@@ -106,11 +107,60 @@ export function resolveTokens(
   city: City,
   districtName: string | null,
   factionName: string | null,
+  citizenName?: string | null,
 ): string {
   return text
     .replaceAll('{city}', city.name)
     .replaceAll('{district}', districtName ?? 'the city')
-    .replaceAll('{faction}', factionName ?? 'a concerned citizen group');
+    .replaceAll('{faction}', factionName ?? 'a concerned citizen group')
+    .replaceAll('{citizen}', citizenName ?? 'a local of some standing');
+}
+
+/**
+ * Resolve which notable citizen the `{citizen}` token names for an event.
+ *
+ * Resolution rules (all deterministic):
+ *   1. If this event def already cast a citizen (recorded in
+ *      `city.citizenInvolvements`), reuse them — so a chain/follow-up that
+ *      references the same def keeps the same name.
+ *   2. Otherwise prefer a cast member whose home is the involved district;
+ *      fall back to the whole cast.
+ *   3. The pick uses its OWN hashed sub-stream (`:citizen:<day>:<defId>`) so it
+ *      never perturbs the tick / choice RNG sequences.
+ *
+ * The chosen citizen is recorded against `defId` (mutating the passed-in city,
+ * which the caller has already cloned for the tick) so replays reproduce it and
+ * follow-up texts reuse the same name. Returns null when the city has no cast.
+ */
+export function resolveCitizen(
+  city: City,
+  defId: string,
+  districtId: string | null,
+): NotableCitizen | null {
+  const cast = city.cast ?? [];
+  if (cast.length === 0) return null;
+
+  // 1. Reuse a citizen this event def already cast (chain/follow-up continuity).
+  const prior = (city.citizenInvolvements ?? []).find((i) => i.defId === defId);
+  if (prior) {
+    const same = cast.find((c) => c.id === prior.citizenId);
+    if (same) return same;
+  }
+
+  // 2. Prefer the involved district's residents, else the whole cast.
+  const local = districtId ? cast.filter((c) => c.homeDistrictId === districtId) : [];
+  const pool = local.length > 0 ? local : cast;
+
+  // 3. Pick from a dedicated sub-stream so no existing stream is disturbed.
+  const rng = new Rng(hashSeed(`${city.seed.raw}:citizen:${city.day}:${defId}`));
+  const chosen = rng.pick(pool);
+
+  // Record the casting so chain texts reuse it (plain data on city state).
+  if (!city.citizenInvolvements) city.citizenInvolvements = [];
+  if (!city.citizenInvolvements.some((i) => i.defId === defId)) {
+    city.citizenInvolvements.push({ defId, citizenId: chosen.id, day: city.day });
+  }
+  return chosen;
 }
 
 export function instantiateEvent(
@@ -131,20 +181,24 @@ export function instantiateEvent(
 
   const districtName = district?.name ?? null;
   const factionName = faction?.name ?? null;
+  // Cast a notable citizen for this event (preferring the involved district),
+  // recording the casting on the city so chain/follow-up texts reuse the name.
+  const citizen = resolveCitizen(city, def.id, district?.id ?? null);
+  const citizenName = citizen?.name ?? null;
   return {
     defId: def.id,
     day: city.day,
-    title: resolveTokens(def.title, city, districtName, factionName),
-    description: resolveTokens(def.description, city, districtName, factionName),
+    title: resolveTokens(def.title, city, districtName, factionName, citizenName),
+    description: resolveTokens(def.description, city, districtName, factionName, citizenName),
     districtId: district?.id ?? null,
     factionId: faction?.id ?? null,
     choices: def.choices.map((choice) => ({
       ...choice,
-      label: resolveTokens(choice.label, city, districtName, factionName),
+      label: resolveTokens(choice.label, city, districtName, factionName, citizenName),
       description: choice.description
-        ? resolveTokens(choice.description, city, districtName, factionName)
+        ? resolveTokens(choice.description, city, districtName, factionName, citizenName)
         : undefined,
-      resultText: resolveTokens(choice.resultText, city, districtName, factionName),
+      resultText: resolveTokens(choice.resultText, city, districtName, factionName, citizenName),
     })),
   };
 }
@@ -242,6 +296,10 @@ export function applyChoiceToCity(
   const factionName = event.factionId
     ? city.factions.find((f) => f.id === event.factionId)?.name ?? null
     : null;
+  // Reuse the citizen this event was cast with (recorded at instantiation), so
+  // {citizen} in the result/outcome text names the same townsfolk. Resolution
+  // is deterministic and self-recording; it won't disturb the choice rng below.
+  const citizenName = resolveCitizen(city, event.defId, district?.id ?? null)?.name ?? null;
 
   applyStatDelta(city, choice.effects, {
     trustDampened: true,
@@ -266,7 +324,7 @@ export function applyChoiceToCity(
 
   news.push({
     day: city.day,
-    text: resolveTokens(choice.resultText, city, districtName, factionName),
+    text: resolveTokens(choice.resultText, city, districtName, factionName, citizenName),
     tone: 'neutral',
   });
 
@@ -278,7 +336,7 @@ export function applyChoiceToCity(
     applyFactionEffects(city, outcome.factionEffects);
     news.push({
       day: city.day,
-      text: resolveTokens(outcome.description, city, districtName, factionName),
+      text: resolveTokens(outcome.description, city, districtName, factionName, citizenName),
       tone: 'weird',
     });
     if (outcome.queueEventId) {

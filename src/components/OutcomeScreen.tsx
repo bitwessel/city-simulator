@@ -1,4 +1,5 @@
-import type { BoundedStatKey, City, NewsItem } from '../types';
+import { useState } from 'react';
+import type { BoundedStatKey, ChronicleEntry as ChronicleEntryData, ChronicleKind, City, NewsItem } from '../types';
 import { useGameStore } from '../state/store';
 import {
   NEWS_TONE_COLOR,
@@ -9,6 +10,7 @@ import {
 } from './statMeta';
 import { formatCount } from './format';
 import '../styles/outcome.css';
+import '../styles/chronicle.css';
 
 // A handful of defining stats to immortalize on the chronicle.
 const DEFINING_STATS: BoundedStatKey[] = ['happiness', 'wealth', 'safety', 'magic', 'chaos', 'pollution'];
@@ -19,6 +21,105 @@ function notableNews(news: NewsItem[]): NewsItem[] {
   const pool = flavorful.length >= 3 ? flavorful : news;
   // Most recent first, take up to 3.
   return pool.slice(-3).reverse();
+}
+
+// ---------------------------------------------------------------------------
+// Chronicle epitaph helpers
+// ---------------------------------------------------------------------------
+
+const EPITAPH_KINDS: ChronicleKind[] = ['founding', 'age-up', 'disaster', 'ending'];
+const KIND_ICON: Record<ChronicleKind, string> = {
+  founding: '📜',
+  'age-up': '⭐',
+  district: '🏘️',
+  disaster: '⚡',
+  project: '🏗️',
+  edict: '📣',
+  event: '🗞️',
+  ending: '🏆',
+};
+
+/**
+ * Highlight entries: endings, age-ups, disasters, founding — always shown.
+ * If there are fewer than 4, pull in the rest to fill.
+ */
+function highlightEntries(chronicle: ChronicleEntryData[]): ChronicleEntryData[] {
+  const highlights = chronicle.filter((e) => EPITAPH_KINDS.includes(e.kind));
+  if (highlights.length >= 4) return highlights;
+  // Fill with entries not already in highlights, newest first.
+  const rest = chronicle.filter((e) => !EPITAPH_KINDS.includes(e.kind)).slice(-4);
+  return [...highlights, ...rest];
+}
+
+function ChronicleEntryItem({ entry }: { entry: ChronicleEntryData }) {
+  return (
+    <li className="oc-chronicle__entry">
+      <span className="oc-chronicle__icon" aria-label={entry.kind}>
+        {KIND_ICON[entry.kind]}
+      </span>
+      <div className="oc-chronicle__body">
+        <div>
+          <span className="oc-chronicle__title">{entry.title}</span>
+          <span className="oc-chronicle__day">Day {entry.day}</span>
+        </div>
+        <p className="oc-chronicle__text">{entry.text}</p>
+      </div>
+    </li>
+  );
+}
+
+function ChronicleEpitaph({ chronicle }: { chronicle: ChronicleEntryData[] }) {
+  const [showAll, setShowAll] = useState(false);
+  const highlights = highlightEntries(chronicle);
+  const displayed = showAll ? [...chronicle].reverse() : highlights;
+  const hasMore = chronicle.length > highlights.length;
+
+  return (
+    <>
+      <ul className="oc-chronicle" aria-label="Chronicle highlights">
+        {displayed.map((entry, i) => (
+          <ChronicleEntryItem key={`${entry.day}-${entry.kind}-${i}`} entry={entry} />
+        ))}
+      </ul>
+      {hasMore && (
+        <button
+          className="oc-chronicle__toggle"
+          onClick={() => setShowAll((v) => !v)}
+          aria-expanded={showAll}
+        >
+          {showAll
+            ? `Show highlights only`
+            : `Show all ${chronicle.length} entries`}
+        </button>
+      )}
+    </>
+  );
+}
+
+function SeedCopy({ seed }: { seed: string }) {
+  const [copied, setCopied] = useState(false);
+
+  function handleCopy() {
+    navigator.clipboard.writeText(seed).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2200);
+    });
+  }
+
+  return (
+    <div className="oc-seed">
+      <span className="oc-seed__label">Grown from seed</span>
+      <code className="oc-seed__code">{seed}</code>
+      <button
+        className={`oc-seed__copy${copied ? ' oc-seed__copy--copied' : ''}`}
+        onClick={handleCopy}
+        title="Copy seed to clipboard"
+        aria-label="Copy seed"
+      >
+        {copied ? '✓ Copied!' : '⧉ Copy'}
+      </button>
+    </div>
+  );
 }
 
 export function OutcomeScreen({ city }: { city: City }) {
@@ -74,7 +175,14 @@ export function OutcomeScreen({ city }: { city: City }) {
           })}
         </div>
 
-        {notable.length > 0 && (
+        {/* Chronicle epitaph — the run's storybook highlights */}
+        {city.chronicle && city.chronicle.length > 0 ? (
+          <>
+            <div className="chronicle__rule" />
+            <h2 className="chronicle__section-title">The Chronicle</h2>
+            <ChronicleEpitaph chronicle={city.chronicle} />
+          </>
+        ) : notable.length > 0 && (
           <>
             <div className="chronicle__rule" />
             <h2 className="chronicle__section-title">From the Annals</h2>
@@ -88,9 +196,8 @@ export function OutcomeScreen({ city }: { city: City }) {
           </>
         )}
 
-        <p className="chronicle__seed">
-          Grown from seed <code>{city.seed.raw}</code>
-        </p>
+        <div className="chronicle__rule" />
+        <SeedCopy seed={city.seed.raw} />
 
         <div className="chronicle__actions">
           <button className="mm-btn mm-btn--brass" onClick={() => backToStart()}>

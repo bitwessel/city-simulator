@@ -1,0 +1,209 @@
+/* ===========================================================================
+   Postcard / photo mode (Phase 06 — Part 3)
+
+   In photo mode the entire game HUD hides so the player can frame a clean
+   shot of the diorama. Only the minimal photo toolbar appears, floating above
+   everything (z-index > 50 to sit above even the ticker at 35 and the modal
+   backdrops at 48–50).
+   =========================================================================== */
+
+/* ===== PHOTO MODE — hide all HUD chrome ===== */
+.game--photo .game__overlay,
+.game--photo .ticker,
+.game--photo .age-banner,
+.game--photo .event-toast,
+.game--photo .biocard {
+  display: none !important;
+}
+
+/* ===== PHOTO TOOLBAR ===== */
+/* Floats at the bottom center, above everything. The follow-bar Esc label
+   and the postcard flair controls live here alongside capture + exit. */
+.photo-toolbar {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: var(--mm-sp-3);
+  padding: 10px 16px;
+  border-radius: var(--mm-radius-pill);
+  /* Warm parchment glass — distinct from the default blue-glass panels. */
+  background: rgba(255, 248, 230, 0.90);
+  border: 1px solid rgba(194, 145, 60, 0.55);
+  box-shadow: 0 8px 32px rgba(74, 53, 34, 0.32), 0 0 0 1px rgba(255, 255, 255, 0.4) inset;
+  -webkit-backdrop-filter: blur(var(--mm-blur));
+  backdrop-filter: blur(var(--mm-blur));
+  animation: mm-slide-up 0.3s var(--mm-ease);
+  /* Pointer events on: the toolbar must be clickable. */
+  pointer-events: auto;
+}
+
+.photo-toolbar__sep {
+  width: 1px;
+  height: 24px;
+  background: rgba(194, 145, 60, 0.3);
+  flex-shrink: 0;
+}
+
+/* ===== Flair section: frame + golden-hour toggle ===== */
+.photo-flair {
+  display: flex;
+  align-items: center;
+  gap: var(--mm-sp-2);
+}
+
+.photo-flair__label {
+  font-size: var(--mm-fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--mm-ink-soft);
+  white-space: nowrap;
+}
+
+/* Frame picker: small pill buttons */
+.photo-frame-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: var(--mm-radius-pill);
+  border: 1px solid rgba(194, 145, 60, 0.4);
+  background: rgba(255, 255, 255, 0.45);
+  color: var(--mm-ink);
+  font-family: var(--mm-body);
+  font-weight: 700;
+  font-size: var(--mm-fs-xs);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  white-space: nowrap;
+}
+.photo-frame-btn:hover {
+  background: rgba(255, 255, 255, 0.75);
+  border-color: var(--mm-brass);
+}
+.photo-frame-btn--active {
+  background: linear-gradient(180deg, var(--mm-honey), var(--mm-brass));
+  border-color: rgba(122, 90, 26, 0.4);
+  color: #4a3406;
+}
+
+/* Golden-hour toggle button */
+.photo-golden-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 11px;
+  border-radius: var(--mm-radius-pill);
+  border: 1px solid rgba(194, 145, 60, 0.4);
+  background: rgba(255, 255, 255, 0.45);
+  color: var(--mm-ink);
+  font-family: var(--mm-body);
+  font-weight: 700;
+  font-size: var(--mm-fs-xs);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  white-space: nowrap;
+}
+.photo-golden-btn:hover {
+  background: rgba(255, 255, 255, 0.75);
+  border-color: var(--mm-brass);
+}
+.photo-golden-btn--active {
+  background: linear-gradient(180deg, #ffdb85, #e8a032);
+  border-color: rgba(200, 120, 20, 0.5);
+  color: #5a3200;
+}
+
+/* ===== Capture button ===== */
+.photo-capture-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 38px;
+  padding: 0 18px;
+  border-radius: var(--mm-radius-pill);
+  border: 1px solid rgba(122, 90, 26, 0.45);
+  background: linear-gradient(180deg, #fff4c8, #e8b932);
+  color: #4a3000;
+  font-family: var(--mm-body);
+  font-weight: 800;
+  font-size: var(--mm-fs-sm);
+  cursor: pointer;
+  transition: opacity 0.15s ease, transform 0.08s ease;
+  box-shadow: 0 2px 8px rgba(200, 140, 0, 0.3);
+  white-space: nowrap;
+}
+.photo-capture-btn:hover {
+  opacity: 0.9;
+}
+.photo-capture-btn:active {
+  transform: translateY(1px);
+}
+.photo-capture-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.photo-capture-btn__icon {
+  font-size: 1.1rem;
+}
+
+/* ===== Exit photo mode button ===== */
+.photo-exit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: var(--mm-radius-pill);
+  border: 1px solid var(--mm-glass-hairline);
+  background: rgba(255, 255, 255, 0.4);
+  color: var(--mm-ink-soft);
+  font-family: var(--mm-body);
+  font-weight: 700;
+  font-size: var(--mm-fs-xs);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  white-space: nowrap;
+}
+.photo-exit-btn:hover {
+  background: rgba(255, 255, 255, 0.7);
+  border-color: var(--mm-ink-soft);
+  color: var(--mm-ink);
+}
+
+/* ===== "Framing" hint label (subtle, not distracting) ===== */
+.photo-hint {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  padding: 6px 16px;
+  border-radius: var(--mm-radius-pill);
+  background: rgba(255, 248, 230, 0.82);
+  border: 1px solid rgba(194, 145, 60, 0.35);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  font-size: var(--mm-fs-xs);
+  font-weight: 700;
+  color: var(--mm-ink-soft);
+  letter-spacing: 0.06em;
+  pointer-events: none;
+  animation: mm-slide-down 0.3s var(--mm-ease);
+}
+
+/* ===== Camera button in ControlBar ===== */
+.ctrl-btn--camera {
+  font-size: 1.15rem;
+  /* A touch of warm gold to hint at its special nature. */
+  color: var(--mm-brass);
+}
+.ctrl-btn--camera:hover:not(:disabled) {
+  color: var(--mm-ink);
+}

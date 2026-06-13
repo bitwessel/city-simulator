@@ -1855,7 +1855,7 @@ export const EVENT_POOL: GameEventDef[] = [
     id: 'cheese-incident',
     title: 'The Great Cheese of {city}',
     description:
-      'A cheesemaker has produced a wheel of cheese so large and so aromatic that it has been declared a navigational landmark. Ships use it to find the harbor. It is, by all accounts, magnificent.',
+      '{citizen} has produced a wheel of cheese so large and so aromatic that it has been declared a navigational landmark. Ships use it to find the harbor. It is, by all accounts, magnificent.',
     tags: ['festival', 'economy', 'weird'],
     weight: 10,
     choices: [
@@ -1864,7 +1864,7 @@ export const EVENT_POOL: GameEventDef[] = [
         label: 'Build a festival around the Great Cheese',
         effects: { wealth: 4, culture: 5, happiness: 5, beauty: -2 },
         factionEffects: { merchants: 6, 'street-performers': 6 },
-        resultText: 'The Cheese Festival is born. The wheel is now a beloved, faintly alarming civic mascot.',
+        resultText: 'The Cheese Festival is born, with {citizen} as its reluctant guest of honor. The wheel is now a beloved, faintly alarming civic mascot.',
       },
       {
         id: 'export-cheese',
@@ -2016,7 +2016,7 @@ export const EVENT_POOL: GameEventDef[] = [
         label: 'Fund a frog philosophy symposium',
         effects: { culture: 6, magic: 3, wealth: -3 },
         factionEffects: { archivists: 8, mages: 4 },
-        resultText: 'The symposium is a triumph. The keynote frog receives a standing ovation and a fly buffet.',
+        resultText: 'The symposium is a triumph, chaired with great dignity by {citizen}. The keynote frog receives a standing ovation and a fly buffet.',
       },
       {
         id: 'relocate-frogs',
@@ -2207,7 +2207,7 @@ export const EVENT_POOL: GameEventDef[] = [
     id: 'great-bake-off',
     title: 'The Bakers of {city} Have Declared War',
     description:
-      'A rivalry between two beloved bakeries has escalated into an all-out pastry arms race. The streets smell incredible. Tensions are high. Someone has weaponized a croissant.',
+      'A rivalry between two beloved bakeries — one of them {citizen}\'s — has escalated into an all-out pastry arms race. The streets smell incredible. Tensions are high. Someone has weaponized a croissant.',
     tags: ['festival', 'economy', 'culture'],
     weight: 11,
     choices: [

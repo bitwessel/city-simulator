@@ -205,6 +205,12 @@ function DistrictArea({
     document.body.style.cursor = 'auto';
   };
   const handleClick = (e: ThreeEvent<MouseEvent>) => {
+    // The picking cylinder is an invisible volume: when the same ray also hit
+    // a notable-citizen pick sphere (phase 06), the citizen is the visible,
+    // intended target — yield without stopping propagation so the click
+    // reaches it (R3F delivers hits nearest-first, and the cylinder wall is
+    // usually in front of a citizen standing inside the district).
+    if (e.intersections.some((h) => h.object.userData?.castPick === true)) return;
     e.stopPropagation();
     onSelect(district.id);
   };

@@ -4,14 +4,16 @@ import { useGameStore } from '../state/store';
 import { CityTab } from './CityTab';
 import { DistrictsTab } from './DistrictsTab';
 import { FactionsTab } from './FactionsTab';
+import { ChronicleTab } from './ChronicleTab';
 import { MOBILE_QUERY, useMediaQuery } from './useMediaQuery';
 
-type TabKey = 'city' | 'districts' | 'factions';
+type TabKey = 'city' | 'districts' | 'factions' | 'chronicle';
 
 const TABS: { key: TabKey; label: string; icon: string }[] = [
   { key: 'city', label: 'City', icon: '🏰' },
   { key: 'districts', label: 'Districts', icon: '🗺️' },
   { key: 'factions', label: 'Factions', icon: '⚖️' },
+  { key: 'chronicle', label: 'Chronicle', icon: '📜' },
 ];
 
 /** The tab strip, shared by the docked desktop panel and the mobile sheet. */
@@ -41,6 +43,7 @@ function TabBody({ tab, city }: { tab: TabKey; city: City }) {
       {tab === 'city' && <CityTab city={city} />}
       {tab === 'districts' && <DistrictsTab city={city} />}
       {tab === 'factions' && <FactionsTab city={city} />}
+      {tab === 'chronicle' && <ChronicleTab city={city} />}
     </>
   );
 }
@@ -134,16 +137,21 @@ export function LeftPanel({ city }: { city: City }) {
 
   return (
     <aside className="leftpanel mm-panel mm-panel--gloss">
-      <div className="leftpanel__head">
-        <TabStrip tab={tab} setTab={setTab} />
+      <div className="leftpanel__chrome">
         <button
-          className="leftpanel__collapse"
+          className="leftpanel__hide"
           onClick={() => setCollapsed(true)}
           title="Collapse panel"
           aria-label="Collapse panel"
         >
-          «
+          <span className="leftpanel__hide-ico" aria-hidden>
+            «
+          </span>
+          Collapse
         </button>
+      </div>
+      <div className="leftpanel__tabs">
+        <TabStrip tab={tab} setTab={setTab} />
       </div>
       <div className="tabbody mm-scroll">
         <TabBody tab={tab} city={city} />

@@ -1,6 +1,7 @@
 import type { City } from '../types';
 import { clampStat } from '../utils/math';
 import { EDICT_POOL } from './data/edicts';
+import { edictChronicleEntry, pushChronicle } from './chronicle';
 
 // Pure edict logic: validation, state transitions, and cooldown checks.
 // No React, no RNG — edict drift is passive, deterministic, and driven by
@@ -71,6 +72,7 @@ export function declareEdict(city: City, edictId: string | null): City {
       text: 'The mayor quietly sets aside the standing proclamation. Life resumes its ordinary shape.',
       tone: 'neutral',
     });
+    pushChronicle(next, edictChronicleEntry(next, null));
   } else {
     const def = getEdictDef(edictId)!;
     next.activeEdict = edictId;
@@ -90,6 +92,7 @@ export function declareEdict(city: City, edictId: string | null): City {
     // Push the proclamation text into the news feed, resolving {city}.
     const text = def.proclamation.replaceAll('{city}', next.name);
     next.news.push({ day: city.day, text, tone: 'good' });
+    pushChronicle(next, edictChronicleEntry(next, def.name));
   }
 
   return next;

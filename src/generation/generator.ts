@@ -43,6 +43,8 @@ import {
   type DistrictArchetype,
 } from './data/names';
 import { QUIRK_POOL } from './data/quirks';
+import { generateCast } from './cast';
+import { foundingChronicleEntries } from '../simulation/chronicle';
 import { deriveCityMood } from '../simulation/mood';
 
 /** Generate a random human-friendly seed string (for the "surprise me" button). */
@@ -183,6 +185,10 @@ export function generateCity(seedRaw: string, founding?: FoundingChoices): City 
 
   const briefing = generateBriefing(rng, name, quirks, factions, risks, chosenSite);
 
+  // Cast: a small named ensemble drawn from its OWN `:cast` sub-stream so the
+  // main generation rng sequence (and the snapshot guard) is untouched.
+  const cast = generateCast(seedRaw, districts);
+
   const city: City = {
     seed,
     name,
@@ -215,9 +221,15 @@ export function generateCity(seedRaw: string, founding?: FoundingChoices): City 
     foundingPopulation: stats.population,
     lastDistrictFoundedDay: 0,
     terrain,
+    cast,
+    chronicle: [],
+    citizenInvolvements: [],
     ...(founding ? { founding } : {}),
   };
   city.history.push({ day: 1, stats: { ...stats } });
+  // The chronicle opens with the founding (and any ritual choices). Pure
+  // text derived from already-decided facts — no RNG.
+  city.chronicle!.push(...foundingChronicleEntries(city, chosenSite));
   city.mood = deriveCityMood(city.stats);
   return city;
 }

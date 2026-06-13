@@ -1,6 +1,7 @@
 import type {
   ActiveEvent,
   City,
+  EventChoice,
   GameEventDef,
   HeadlineTemplate,
   NewsItem,
@@ -27,6 +28,14 @@ import { FAVOR_CAP, favorRegen, getFavor, getProjectDef } from '../projects/proj
 import { applyWonderDrift, startWonder, tickWonder } from '../projects/wonders';
 import { applyFactionEffects, applyStatDelta } from '../events/system';
 import { EDICT_POOL } from './data/edicts';
+import {
+  disasterChronicleEntry,
+  endingChronicleEntry,
+  eventChronicleEntry,
+  hasChronicleEntry,
+  projectChronicleEntry,
+  pushChronicle,
+} from './chronicle';
 
 // ---------------------------------------------------------------------------
 // The simulation engine. `simulateDay` is a pure function: given a city it
@@ -110,6 +119,11 @@ export function simulateDay(
   const outcome = checkOutcomes(city, city.outcomeStreaks);
   if (outcome) {
     city.outcome = outcome;
+    // The chronicle's closing line — the run's epitaph. Derived from the
+    // already-decided outcome; no RNG.
+    if (!hasChronicleEntry(city, 'ending', outcome.day)) {
+      pushChronicle(city, endingChronicleEntry(city, outcome));
+    }
   }
 
   return { day: city.day, city, headlines, triggeredEvent, outcome };
@@ -135,10 +149,61 @@ export function applyEventChoice(
   if (choice.startsWonderId) {
     startWonder(city, choice.startsWonderId, news);
   }
+  // Chronicle the decision when it's a *major* one — a wonder begun, a chain
+  // set in motion, or a hefty stat swing. Text is derived from the already-
+  // resolved result line (no RNG). The cast member the event named (if any) is
+  // referenced so the timeline can link them.
+  maybeChronicleChoice(city, event, choice, news);
   city.news.push(...news);
   trimLog(city.news, 120);
   city.mood = deriveCityMood(city.stats);
   return { city, news };
+}
+
+/** Total absolute stat magnitude of a choice's declared effects. */
+function choiceMagnitude(choice: EventChoice): number {
+  return Object.values(choice.effects).reduce((sum, v) => sum + Math.abs(v as number), 0);
+}
+
+/**
+ * Append a chronicle entry for a *major* event choice. "Major" = it begins a
+ * wonder, queues a chain/follow-up, or carries a hefty stat swing (>=18 total
+ * magnitude — most flavor choices fall well below this). Pure: the entry text
+ * reuses the already-resolved result line; no RNG is drawn.
+ */
+function maybeChronicleChoice(
+  city: City,
+  event: ActiveEvent,
+  choice: EventChoice,
+  news: NewsItem[],
+): void {
+  const major =
+    !!choice.startsWonderId ||
+    !!choice.unlocksEventId ||
+    (choice.outcomes ?? []).some((o) => o.queueEventId) ||
+    choiceMagnitude(choice) >= 18;
+  if (!major) return;
+
+  // The first news line is the choice's resolved resultText (tokens already
+  // filled, including any {citizen}). Use it as the chronicle's body.
+  const resultText = news[0]?.text ?? event.title;
+  const district = event.districtId
+    ? city.districts.find((d) => d.id === event.districtId)
+    : undefined;
+  const involvement = (city.citizenInvolvements ?? []).find((i) => i.defId === event.defId);
+  const citizen = involvement
+    ? (city.cast ?? []).find((c) => c.id === involvement.citizenId)
+    : undefined;
+
+  pushChronicle(
+    city,
+    eventChronicleEntry(city, event.title, resultText, {
+      districtId: district?.id,
+      districtName: district?.name,
+      citizenId: citizen?.id,
+      citizenName: citizen?.name,
+    }),
+  );
 }
 
 // ----- Daily systems ---------------------------------------------------------
@@ -236,6 +301,7 @@ function tickConstruction(city: City, headlines: NewsItem[]): void {
       text: `${def.name} is finished! ${district.name} gathers to admire it, and a ribbon is cut with great and slightly excessive ceremony.`,
       tone: 'good',
     });
+    pushChronicle(city, projectChronicleEntry(city, def.name, district));
   }
   city.activeProjects = stillBuilding;
 }
@@ -560,6 +626,18 @@ const RISK_FLAVOR: Record<RiskKind, { rise: string; disaster: string; effects: R
   },
 };
 
+/** Short, chronicle-friendly title per risk kind (e.g. 'A Great Fire'). */
+const RISK_TITLES: Record<RiskKind, string> = {
+  fire: 'A Great Fire',
+  flood: 'The Flood',
+  crime: 'A Crime Wave',
+  unrest: 'The Unrest',
+  plague: 'The Pox',
+  'magical-surge': 'A Magical Surge',
+  'economic-bust': 'The Market Crash',
+  monster: 'The Monster',
+};
+
 function updateRisks(city: City, rng: Rng): void {
   const s = city.stats;
   const adjust = (kind: RiskKind, delta: number) => {
@@ -614,6 +692,8 @@ function rollDisasters(city: City, rng: Rng, headlines: NewsItem[]): void {
       text: resolveTokens(flavor.disaster, city, district.name, null),
       tone: 'bad',
     });
+    // The chronicle records the disaster as *survived* — warm, never grim.
+    pushChronicle(city, disasterChronicleEntry(city, district.name, RISK_TITLES[risk.kind]));
     for (const [key, value] of Object.entries(flavor.effects)) {
       if (key === 'population') {
         city.stats.population = Math.max(0, city.stats.population + value);
@@ -643,11 +723,39 @@ function rollHeadline(
   const headline = rng.weighted(eligible, (h) => h.weight);
   const district = city.districts.length > 0 ? rng.pick(city.districts) : null;
   const faction = city.factions.length > 0 ? rng.pick(city.factions) : null;
+  // Resolve {citizen} for headlines from a dedicated sub-stream (keyed by day),
+  // preferring a cast member from the picked district. Headlines don't need
+  // chain continuity, so this is a lightweight pick that doesn't disturb the
+  // tick rng. Only computed when the chosen template actually uses the token.
+  const citizenName = headline.text.includes('{citizen}')
+    ? pickHeadlineCitizen(city, district?.id ?? null)
+    : null;
   headlines.push({
     day: city.day,
-    text: resolveTokens(headline.text, city, district?.name ?? null, faction?.name ?? null),
+    text: resolveTokens(
+      headline.text,
+      city,
+      district?.name ?? null,
+      faction?.name ?? null,
+      citizenName,
+    ),
     tone: headline.tone,
   });
+}
+
+/**
+ * Pick a cast member's name for a headline's `{citizen}` token, preferring the
+ * involved district. Uses its own `:headline-citizen:<day>` sub-stream so the
+ * tick rng (and thus event/headline determinism) is untouched. Returns null
+ * when the city has no cast.
+ */
+function pickHeadlineCitizen(city: City, districtId: string | null): string | null {
+  const cast = city.cast ?? [];
+  if (cast.length === 0) return null;
+  const local = districtId ? cast.filter((c) => c.homeDistrictId === districtId) : [];
+  const pool = local.length > 0 ? local : cast;
+  const rng = new Rng(hashSeed(`${city.seed.raw}:headline-citizen:${city.day}`));
+  return rng.pick(pool).name;
 }
 
 function maybeTriggerEvent(

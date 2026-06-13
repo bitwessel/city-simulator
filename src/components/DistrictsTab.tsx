@@ -4,6 +4,7 @@ import { DISTRICT_TYPE_META, RISK_META } from './statMeta';
 import { LabeledMeter, Meter } from './Meter';
 import { formatCount } from './format';
 import { CommissionSection } from './CommissionSection';
+import { NotableCitizensList } from './NotableCitizensList';
 
 function moodColor(mood: number): string {
   if (mood >= 60) return 'var(--mm-good)';
@@ -81,6 +82,22 @@ function DistrictDetail({ city, district }: { city: City; district: District }) 
           );
         })
       )}
+
+      {(() => {
+        const locals = (city.cast ?? []).filter((c) => c.homeDistrictId === district.id);
+        return locals.length > 0 ? (
+          <>
+            <h4 className="section__title" style={{ marginTop: 10 }}>
+              Notable Citizens
+            </h4>
+            <NotableCitizensList
+              citizens={locals}
+              districts={city.districts}
+              showDistrict={false}
+            />
+          </>
+        ) : null;
+      })()}
 
       <CommissionSection city={city} district={district} />
     </div>

@@ -42,6 +42,15 @@ const ROWS_PER_PLOT = 4;
 interface SceneryProps {
   city: City;
   theme: MoodTheme;
+  /** 0..1 density factor from the adaptive perf governor (default 1). Thins the
+   *  shadow-casting forest on struggling GPUs. */
+  quality?: number;
+}
+
+/** Keep a deterministic prefix of `arr` scaled by quality (1 = whole array). */
+function thin<T>(arr: T[], quality: number): T[] {
+  if (quality >= 1) return arr;
+  return arr.slice(0, Math.max(0, Math.ceil(arr.length * quality)));
 }
 
 /** Bloom color palette, picked per-instance by tint. */
@@ -54,7 +63,7 @@ function plotBaseColor(plot: FieldPlot): string {
   return '#a9854f';
 }
 
-export function Scenery({ city, theme }: SceneryProps) {
+export function Scenery({ city, theme, quality = 1 }: SceneryProps) {
   const flatsLen = city.terrain?.flats.length ?? 0;
 
   // Seed-only candidates. Re-derived when a founding adds a plateau flat,
@@ -95,7 +104,10 @@ export function Scenery({ city, theme }: SceneryProps) {
     [statics, plots, flowers, roadPolylines, devKey],
   );
 
-  const { trees, bushes, rocks } = visible;
+  // Thin the shadow-casting greenery on weak GPUs (deterministic prefix slice).
+  const trees = useMemo(() => thin(visible.trees, quality), [visible.trees, quality]);
+  const bushes = useMemo(() => thin(visible.bushes, quality), [visible.bushes, quality]);
+  const rocks = useMemo(() => thin(visible.rocks, quality), [visible.rocks, quality]);
   const conifers = useMemo(() => trees.filter((t) => t.variant === 0), [trees]);
   const broadleafs = useMemo(() => trees.filter((t) => t.variant === 1), [trees]);
   const poplars = useMemo(() => trees.filter((t) => t.variant === 2), [trees]);

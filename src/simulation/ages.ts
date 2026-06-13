@@ -1,5 +1,6 @@
 import type { AgeId, AgeLogEntry, City, NewsItem } from '../types';
 import { AGE_ORDER } from '../types';
+import { ageUpChronicleEntry, pushChronicle } from './chronicle';
 
 // ---------------------------------------------------------------------------
 // Ages (phase 04) — the city's growth formalized into five named ages:
@@ -247,5 +248,6 @@ export function checkAgeUp(city: City, headlines: NewsItem[]): AgeDef | null {
     text: `${city.name} enters ${next.title}! ${next.flavor} Fireworks are deployed; the committee responsible takes a bow.`,
     tone: 'good',
   });
+  pushChronicle(city, ageUpChronicleEntry(city, next.id, next.title, next.flavor));
   return next;
 }
