@@ -1,10 +1,16 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame, type ThreeEvent } from '@react-three/fiber';
 import { Billboard, Text } from '@react-three/drei';
-import type { Mesh } from 'three';
-import type { City, District } from '../types';
+import type { Group, Mesh } from 'three';
+import type { AgeId, Building, City, District } from '../types';
 import { terrainHeightAt } from '../generation/terrain';
 import { BuildingMesh, type BuildingPalette } from './BuildingMesh';
+import {
+  createEmissiveMergeMaterial,
+  isMergeableKind,
+  MATTE_MERGE_MATERIAL,
+  mergeDistrictBuildings,
+} from './buildingGeometry';
 import { Decorations } from './Decorations';
 import { SELECT_RING } from './shared';
 import { ribbonGeometry, type RoadSample } from './Roads';
@@ -87,6 +93,26 @@ function DistrictArea({
       era,
     );
   }, [district.visualStyle.baseColor, district.visualStyle.accentColor, theme, district.mood, era]);
+
+  // The merged-statics palette bakes its colors into geometry, so it must NOT
+  // rebuild on every daily mood drift (district.mood eases a little each tick).
+  // Quantize the local mood to coarse steps: the merged buildings still track
+  // mood, but the merge only re-bakes when the tint crosses a step (rare), not
+  // every day. Individual buildings keep the smooth `buildingPalette` above.
+  const qMood = Math.round(district.mood / 8) * 8;
+  const mergePalette = useMemo<BuildingPalette>(() => {
+    const wall = districtMoodTintHex(district.visualStyle.baseColor, theme, qMood);
+    return applyEraToPalette(
+      {
+        wall: scaleHex(wall, 1.12),
+        accent: district.visualStyle.accentColor,
+        trim: scaleHex(wall, 0.78),
+        glow: mixHex(district.visualStyle.accentColor, '#ffffff', 0.3),
+        glowI: theme.windowGlow,
+      },
+      era,
+    );
+  }, [district.visualStyle.baseColor, district.visualStyle.accentColor, theme, qMood, era]);
 
   // Decoration colors (greenery), nudged by mood.
   const decoColors = useMemo(
@@ -180,6 +206,21 @@ function DistrictArea({
     for (let i = 0; i < n; i++) set.add(sorted[i].id);
     return set;
   }, [visibleBuildings, chaos]);
+
+  // Split the built roster: the static, matte, non-animated kinds collapse into
+  // a single merged matte + emissive mesh per district (the building draw-call
+  // reduction pass). Everything else — animated kinds, construction sites, the
+  // couple of wobble buildings, wonders, metallic/transparent landmarks — keeps
+  // rendering as an individual <BuildingMesh>.
+  const { mergedBuildings, individualBuildings } = useMemo(() => {
+    const mergedB: Building[] = [];
+    const individualB: Building[] = [];
+    for (const b of visibleBuildings) {
+      if (!b.construction && !wobbleSet.has(b.id) && isMergeableKind(b.kind)) mergedB.push(b);
+      else individualB.push(b);
+    }
+    return { mergedBuildings: mergedB, individualBuildings: individualB };
+  }, [visibleBuildings, wobbleSet]);
 
   // Pulse the selection ring.
   useFrame((state) => {
@@ -282,9 +323,24 @@ function DistrictArea({
         </mesh>
       ))}
 
-      {/* Buildings, each grounded at its own terrain height, facing the
-          nearest path. */}
-      {visibleBuildings.map((b) => (
+      {/* The merged static roster: ~2 draw calls for the bulk of the district
+          (matte bodies + emissive windows), baked from the same per-building
+          transform + varied palette the individual path uses. */}
+      <MergedStatics
+        buildings={mergedBuildings}
+        palette={mergePalette}
+        heights={buildingHeights}
+        facings={facings}
+        cx={cx}
+        cz={cz}
+        groundY={groundY}
+        era={era}
+      />
+
+      {/* Individual buildings: animated, construction, wobble, and the
+          metallic/transparent landmark/wonder kinds, each grounded at its own
+          terrain height and facing the nearest path. */}
+      {individualBuildings.map((b) => (
         <group key={b.id} position={[0, buildingHeights.get(b.id) ?? groundY, 0]}>
           <BuildingMesh
             building={b}
@@ -321,6 +377,120 @@ function DistrictArea({
             </Text>
           </Billboard>
         </Suspense>
+      )}
+    </group>
+  );
+}
+
+interface MergedStaticsProps {
+  buildings: Building[];
+  palette: BuildingPalette;
+  heights: Map<string, number>;
+  facings: Map<string, number>;
+  /** District center + plateau height: the merge bakes parts relative to this
+   *  so the era-change scale-pop pivots around the district, not the world. */
+  cx: number;
+  cz: number;
+  groundY: number;
+  era: AgeId;
+}
+
+/**
+ * The merged static roster of one district. Bakes every mergeable building's
+ * world transform + per-building varied color into one matte BufferGeometry +
+ * one emissive BufferGeometry (≈2 draw calls instead of ~hundreds). Re-merges
+ * only when a building appears or the era/mood palette changes; disposes old
+ * geometry on rebuild. Buildings carry no clicks (district picking is a separate
+ * cylinder) so the meshes are `raycast={() => null}`.
+ */
+function MergedStatics({
+  buildings,
+  palette,
+  heights,
+  facings,
+  cx,
+  cz,
+  groundY,
+  era,
+}: MergedStaticsProps) {
+  const groupRef = useRef<Group>(null);
+
+  const merge = useMemo(
+    () =>
+      mergeDistrictBuildings(
+        buildings,
+        palette,
+        cx,
+        groundY,
+        cz,
+        (id) => heights.get(id) ?? groundY,
+        (id) => facings.get(id),
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [buildings, palette, heights, facings, cx, cz, groundY],
+  );
+
+  // Free the merged geometry buffers when a rebuild supersedes them / unmount.
+  useEffect(
+    () => () => {
+      merge.matte?.dispose();
+      merge.emissive?.dispose();
+    },
+    [merge],
+  );
+
+  // One emissive material per district. The merge flattens every window/lamp to
+  // a single intensity (per the draw-call pass tradeoff), so day-glow is a
+  // representative fraction of the mood/era window glow; applyNightGlow then
+  // sweeps it up to its night ceiling. Per-window tint is preserved (vertex
+  // colors), only the intensity is uniform.
+  const emisMat = useMemo(
+    () => createEmissiveMergeMaterial(palette.glowI * 0.6),
+    [palette.glowI],
+  );
+  useEffect(() => () => emisMat.dispose(), [emisMat]);
+
+  // Era-change re-dress "poof": a quick per-district group scale-pop when the
+  // age changes (and once on first mount). Incremental single-building appears
+  // do NOT pop — a per-district merge can't pop one building without re-popping
+  // the whole district, so they simply appear (a small, accepted charm loss).
+  const eraRef = useRef<AgeId | null>(null);
+  const popStart = useRef<number | null>(null);
+  useFrame((state) => {
+    const g = groupRef.current;
+    if (!g) return;
+    if (eraRef.current !== era) {
+      eraRef.current = era;
+      popStart.current = state.clock.elapsedTime;
+    }
+    if (popStart.current !== null) {
+      const prog = Math.min(1, (state.clock.elapsedTime - popStart.current) / 0.7);
+      // easeOutBack, scaled to a gentle 0.82→1 re-dress bounce (not a full
+      // collapse — the district reads as settling into its new dress).
+      const c = 1.70158;
+      const e = 1 + (c + 1) * Math.pow(prog - 1, 3) + c * Math.pow(prog - 1, 2);
+      g.scale.setScalar(0.82 + 0.18 * Math.max(0, e));
+      if (prog >= 1) {
+        g.scale.setScalar(1);
+        popStart.current = null;
+      }
+    }
+  });
+
+  if (!merge.matte && !merge.emissive) return null;
+  return (
+    <group ref={groupRef} position={[cx, groundY, cz]}>
+      {merge.matte && (
+        <mesh
+          geometry={merge.matte}
+          material={MATTE_MERGE_MATERIAL}
+          castShadow
+          receiveShadow
+          raycast={() => null}
+        />
+      )}
+      {merge.emissive && (
+        <mesh geometry={merge.emissive} material={emisMat} raycast={() => null} />
       )}
     </group>
   );

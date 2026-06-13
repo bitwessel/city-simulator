@@ -15,7 +15,7 @@ import {
   UNIT_TORUS,
 } from './shared';
 import { hashFloat } from './hash';
-import { shiftHSL } from './palette';
+import { varyPalette } from './buildingGeometry';
 
 // ---------------------------------------------------------------------------
 // BuildingMesh — a distinct low-poly silhouette per BuildingKind (21 kinds).
@@ -2089,27 +2089,6 @@ const ANIMATED_KINDS = new Set<BuildingKind>([
   'wonder-forge', // the great gear
   'wonder-festival', // the great wheel
 ]);
-
-/**
- * Per-building HSL variation so a district reads cohesive but alive instead of
- * monochrome: a subtle hash-driven hue/sat/light shift per building id, plus the
- * occasional roof-accent pop. Cheap — runs once per building per palette change.
- */
-function varyPalette(building: Building, base: BuildingPalette): BuildingPalette {
-  const id = building.id;
-  const dh = (hashFloat(id, 51) - 0.5) * 0.05; //  ±~18° hue
-  const ds = (hashFloat(id, 52) - 0.5) * 0.18; //  ±sat
-  const dl = (hashFloat(id, 53) - 0.5) * 0.16; //  ±light (~±8%)
-  const wall = shiftHSL(base.wall, dh, ds, dl);
-  // Roof accent: mostly the district accent, occasionally a small harmony pop.
-  const accentPop = hashFloat(id, 54);
-  const accent =
-    accentPop < 0.18
-      ? shiftHSL(base.accent, (hashFloat(id, 55) - 0.5) * 0.12, 0.06, 0.04)
-      : shiftHSL(base.accent, dh * 0.5, ds * 0.4, dl * 0.4);
-  const trim = shiftHSL(base.trim, dh, ds * 0.5, dl * 0.6);
-  return { wall, accent, trim, glow: base.glow, glowI: base.glowI, era: base.era };
-}
 
 export function BuildingMesh({ building, palette, wobble = false, facing }: BuildingMeshProps) {
   const rotY = facing ?? building.rotation;
