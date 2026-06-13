@@ -10,6 +10,8 @@ import {
 } from '../simulation/engine';
 import { commissionProject } from '../projects/projects';
 import { declareEdict } from '../simulation/edicts';
+import { getWorld, listWorlds } from '../worlds/registry';
+import { generateCityFromWorld } from '../worlds/loadWorld';
 
 // The single source of truth for the UI. All game logic stays in the
 // simulation/generation modules; the store just routes actions to them.
@@ -87,6 +89,8 @@ export interface GameStore {
   setPanelOpen: (open: boolean) => void;
   dismissOutcome: () => void;
   backToStart: () => void;
+  /** Start a curated world (skips the founding ritual — the world is authored). */
+  beginWorld: (worldId: string, variationSeed?: string) => void;
 }
 
 export const useGameStore = create<GameStore>((set, get) => ({
@@ -254,7 +258,37 @@ export const useGameStore = create<GameStore>((set, get) => ({
       panelOpen: false,
       speed: 2,
     }),
+
+  beginWorld: (worldId, variationSeed) => {
+    const entry = getWorld(worldId);
+    if (!entry || !entry.result.ok) return;
+    const city = generateCityFromWorld(entry.result.world, variationSeed?.trim() || undefined);
+    set((s) => ({
+      screen: 'game',
+      city,
+      speed: 2,
+      activeEvent: null,
+      eventOpen: false,
+      selectedDistrictId: null,
+      selectedFactionId: null,
+      selectedCastId: null,
+      followedCastId: null,
+      photoMode: false,
+      panelOpen: false,
+      runId: s.runId + 1,
+    }));
+  },
 }));
+
+// Dev-only world bridge for scripts/world-check.mjs and authoring sessions:
+// load a curated world by id without touching the UI. Stripped from production.
+if (import.meta.env.DEV && typeof window !== 'undefined') {
+  (window as unknown as { __mmWorld?: object }).__mmWorld = {
+    load: (id: string, variationSeed?: string) =>
+      useGameStore.getState().beginWorld(id, variationSeed),
+    list: () => listWorlds().map((e) => ({ id: e.id, ok: e.result.ok })),
+  };
+}
 
 // Dev-only debug bridge for scripts/age-check.mjs and manual era previews:
 // forces the running city into an age (or a wonder into a construction stage)

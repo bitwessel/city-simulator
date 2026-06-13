@@ -1,0 +1,175 @@
+{
+  "schemaVersion": 1,
+  "id": "saltmarsh-harbor",
+  "name": "Saltmarsh Harbor",
+  "baseSeed": "saltmarsh-harbor-gull",
+  "lore": {
+    "tagline": "Where the tide keeps office hours and the gulls keep secrets",
+    "briefing": "Welcome to Saltmarsh Harbor, Mayor — a briny little port where the marsh shakes hands with the sea and neither has ever quite let go. The tides arrive punctually, the gulls arrive uninvited, and the warehouses smell of tar, kippers, and adventure. The fisherfolk are proud, the lighthouse is older than the records that mention it, and something very large is rumored to nap beneath the docks. Try not to wake it before lunch.",
+    "blurb": "A tide-haunted port town stitched together from marsh, mast, and stubbornness. The lighthouse never sleeps, the fishfolk never hurry, and the deep keeps a slow, snoring secret beneath the pilings.",
+    "moodLean": "serene",
+    "paletteLean": "foggy teal and weathered driftwood, with lamp-amber after dusk"
+  },
+  "districts": [
+    {
+      "type": "harbor",
+      "name": "Saltside Docks",
+      "wealthTilt": 6,
+      "palette": { "baseColor": "#5b7f86", "accentColor": "#d9b06a" }
+    },
+    {
+      "type": "forest-edge",
+      "name": "The Reedwalk",
+      "wealthTilt": -4,
+      "palette": { "baseColor": "#6f8a5a", "accentColor": "#9aa86b" }
+    },
+    {
+      "type": "market",
+      "name": "The Fishgate Market"
+    }
+  ],
+  "landmarks": [
+    {
+      "building": "lighthouse",
+      "districtType": "harbor"
+    }
+  ],
+  "quirks": ["punctual-tides"],
+  "cast": [
+    {
+      "id": "world-saltmarsh-harbor-pernilla",
+      "name": "Old Pernilla Tarr",
+      "archetype": "harbor-master",
+      "personality": "Has run the docks for forty years, fears nothing that floats, and sings the tide to sleep every night whether it wants the lullaby or not.",
+      "homeDistrictId": "district-1-harbor"
+    }
+  ],
+  "events": [
+    {
+      "id": "world/saltmarsh-harbor/the-big-snore",
+      "title": "Something Beneath the Docks Has Begun to Snore",
+      "description": "For three nights running, a deep, contented rumble has rolled up through the pilings of {district}, rattling the mooring ropes and tuning the harbor bells slightly flat. {citizen} swears it is only the big sleeper turning over, and that it has napped down there since before the lighthouse. The newer dockhands are less philosophical, and one has already resigned by leaving his boots and a note that just says 'NOPE'.",
+      "tags": ["harbor", "weird", "nature", "faction"],
+      "weight": 12,
+      "involvedDistrictType": "harbor",
+      "choices": [
+        {
+          "id": "lullaby-patrol",
+          "label": "Fund {citizen}'s nightly lullaby patrol",
+          "description": "Pay the dock crews to sing it back to sleep, properly, in shifts.",
+          "effects": { "wealth": -4, "happiness": 5, "culture": 4, "magic": 3 },
+          "districtEffects": { "mood": 5 },
+          "factionEffects": { "fishermen": 10 },
+          "outcomes": [
+            {
+              "chance": 0.55,
+              "description": "The lullabies work too well — the sleeper now hums back, in harmony, and the whole harbor sleeps like the dead.",
+              "queueEventId": "world/saltmarsh-harbor/the-deep-says-thanks",
+              "delayDays": [3, 5]
+            }
+          ],
+          "resultText": "{citizen} organizes a roster, a songbook, and a thermos rota. By the second night the snoring softens to a purr you could set a watch by."
+        },
+        {
+          "id": "engineers-survey",
+          "label": "Send the engineers down to survey it",
+          "description": "Measure first, panic later. With ropes, lanterns, and a very long pole.",
+          "effects": { "wealth": -5, "infrastructure": 5, "magic": 2, "safety": 2 },
+          "factionEffects": { "engineers": 8, "fishermen": -3 },
+          "outcomes": [
+            {
+              "chance": 0.45,
+              "description": "The survey crew reports the sleeper is the size of a chapel, perfectly harmless, and ticklish around the third piling. They have wisely roped it off.",
+              "effects": { "culture": 3, "safety": 3 }
+            }
+          ],
+          "resultText": "The engineers descend with admirable composure and the long pole. {district} holds its breath and its nose."
+        },
+        {
+          "id": "evict-the-sleeper",
+          "label": "Drive it out with bilge-pumps and bad music",
+          "description": "{citizen} thinks this is a terrible idea and says so, loudly, at length.",
+          "effects": { "chaos": 6, "magic": -4, "happiness": -3 },
+          "districtEffects": { "mood": -6 },
+          "factionEffects": { "fishermen": -10 },
+          "outcomes": [
+            {
+              "chance": 0.6,
+              "description": "It worked, technically. The sleeper has left in a sulk — and taken the punctual tides with it.",
+              "queueEventId": "world/saltmarsh-harbor/the-deep-departs",
+              "delayDays": [3, 5]
+            }
+          ],
+          "resultText": "The pumps roar, the bad music blares, and the rumbling stops with an offended sort of silence. {citizen} won't speak to you for a week."
+        }
+      ]
+    },
+    {
+      "id": "world/saltmarsh-harbor/the-deep-says-thanks",
+      "title": "The Deep Sends Up a Gift",
+      "description": "This morning, every fishing net in {district} came up heavy — not with fish, but with pearls the size of plums, each one warm to the touch and humming the low note of the harbor bells. {citizen} found them stacked tidily on the dock at dawn, with a single enormous, grateful, slightly damp flipper-print pressed into the boards beside them. It seems the sleeper appreciated the lullabies.",
+      "tags": ["harbor", "weird", "magic", "economy"],
+      "weight": 0,
+      "chainOnly": true,
+      "once": true,
+      "involvedDistrictType": "harbor",
+      "choices": [
+        {
+          "id": "sell-pearls",
+          "label": "Sell the singing pearls to fund the harbor",
+          "description": "They fetch a fortune. {citizen} keeps exactly one, for luck.",
+          "effects": { "wealth": 9, "culture": 3, "happiness": 3 },
+          "districtEffects": { "wealth": 6, "mood": 3 },
+          "factionEffects": { "merchants": 8, "fishermen": 6 },
+          "resultText": "The pearls make {city} briefly famous and durably solvent. Collectors come from inland just to hear them hum."
+        },
+        {
+          "id": "shrine-of-thanks",
+          "label": "Build a small dockside shrine and return the favor",
+          "description": "Leave offerings of warm bread and warmer songs at the tide line.",
+          "effects": { "magic": 6, "beauty": 4, "happiness": 4, "wealth": -3 },
+          "districtEffects": { "mood": 6 },
+          "factionEffects": { "fishermen": 10, "gardeners": 4 },
+          "resultText": "The shrine becomes {city}'s gentlest tradition. The sleeper snores on, deeply content, and the fishing is blessed for a generation."
+        }
+      ]
+    },
+    {
+      "id": "world/saltmarsh-harbor/the-deep-departs",
+      "title": "The Harbor Floods on an Unscheduled Tuesday",
+      "description": "Without the sleeper to keep them, the tides of {district} have forgotten their manners entirely. High water arrived at three in the morning, then again at noon, then a third time out of what can only be described as spite. {citizen} stands on the flooded quay in waders, arms folded, radiating an enormous and very specific I-told-you-so.",
+      "tags": ["harbor", "disaster", "infrastructure", "weird"],
+      "weight": 0,
+      "chainOnly": true,
+      "once": true,
+      "involvedDistrictType": "harbor",
+      "choices": [
+        {
+          "id": "send-apology",
+          "label": "Send {citizen} to find the sleeper and apologize",
+          "description": "Grovel. Bring cheese. Possibly a written statement.",
+          "effects": { "wealth": -4, "magic": 4, "happiness": 3, "infrastructure": 2 },
+          "districtEffects": { "mood": 4 },
+          "factionEffects": { "fishermen": 8 },
+          "outcomes": [
+            {
+              "chance": 0.6,
+              "description": "{citizen} returns three days later, soaked, triumphant, and humming. The sleeper has come home, the tides are punctual again, and nobody mentions the bilge-pumps.",
+              "effects": { "magic": 4, "safety": 3, "beauty": 2 }
+            }
+          ],
+          "resultText": "{citizen} rows out past the buoys at dusk, singing the old lullaby across the water, and does not come back until she has results."
+        },
+        {
+          "id": "build-seawall",
+          "label": "Build proper seawalls and live with the chaos tides",
+          "description": "No more relying on a sleeping monster's good manners.",
+          "effects": { "wealth": -8, "infrastructure": 8, "safety": 5, "magic": -3 },
+          "districtEffects": { "mood": 2 },
+          "factionEffects": { "engineers": 10, "fishermen": -4 },
+          "resultText": "The seawalls rise, grey and dependable. {district} stays dry and safe — and a little less magical, which {citizen} never lets you forget."
+        }
+      ]
+    }
+  ]
+}

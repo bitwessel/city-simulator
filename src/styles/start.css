@@ -82,7 +82,15 @@
   position: relative;
   z-index: 2;
   width: min(560px, 92vw);
-  padding: 48px 48px 40px;
+  /* Never let the card grow past the viewport — scroll inside it instead so
+     the top and bottom can't get clipped off-screen. */
+  max-height: calc(100vh - 28px);
+  max-height: calc(100dvh - 28px);
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: 1fr; /* single column until there's room for two */
+  gap: 0; /* spacing/dividers come from each section's own margin + border-top */
+  padding: 44px;
   text-align: center;
   border-radius: var(--mm-radius-xl);
   border: 1px solid rgba(255, 255, 255, 0.6);
@@ -92,6 +100,76 @@
   backdrop-filter: blur(14px) saturate(1.1);
   color: var(--mm-ink);
   animation: mm-pop-in 0.5s var(--mm-ease);
+}
+
+/* Two columns once the screen is wide enough: keep the card squarish so it
+   fits on screen. Left = the create flow (centered); right = the Curated
+   Worlds gallery plus "Add Your Own World". (Mobile stacks them in the
+   natural create → curated → contribute order.) */
+@media (min-width: 760px) {
+  .start__card {
+    width: min(920px, 94vw);
+    grid-template-columns: 1fr 1fr;
+    align-items: stretch;
+    gap: 0;
+    /* Trimmed vertical padding so the squarish card clears short laptops. */
+    padding: 26px 48px;
+  }
+  /* Center the create flow vertically against the taller worlds column. */
+  .start__col--main {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding-right: 44px;
+  }
+  .start__col--worlds {
+    padding-left: 44px;
+    border-left: 1px solid rgba(120, 92, 56, 0.18);
+  }
+  /* In two-column mode the gallery starts at the top, so drop the horizontal
+     divider it wears when stacked below the create flow. */
+  .start__col--worlds > .start__worlds {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
+  }
+  /* The worlds column is narrow — keep gallery cards stacked one-up. */
+  .start__col--worlds .start__worlds-grid {
+    grid-template-columns: 1fr;
+  }
+  /* Tighten the tall blocks so the whole card clears ~768px viewports. */
+  .start__col--main .start__desc {
+    margin: 16px auto 20px;
+  }
+  .start__col--worlds .start__worlds-header {
+    margin-bottom: 10px;
+  }
+  .start__col--worlds .start__contribute {
+    margin-top: 16px;
+    padding-top: 16px;
+  }
+  /* A shorter preview + a clamped blurb keep the gallery from overflowing. */
+  .start__col--worlds .start__world-preview {
+    aspect-ratio: auto;
+    height: 118px;
+  }
+  .start__col--worlds .start__world-info {
+    padding: 11px 16px 13px;
+  }
+  .start__col--worlds .start__world-blurb {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    overflow: hidden;
+  }
+  /* The variation-seed control is an advanced option — keep it compact. */
+  .start__col--worlds .start__worlds-seed {
+    margin-bottom: 4px;
+  }
+  .start__col--worlds .start__hint {
+    margin-top: 8px;
+  }
 }
 
 .start__crest {
@@ -177,4 +255,375 @@
   font-size: var(--mm-fs-sm);
   color: var(--mm-ink-faint);
   font-style: italic;
+}
+
+/* ===========================================================================
+   Curated Worlds gallery (Phase 07)
+   =========================================================================== */
+
+.start__worlds {
+  margin-top: 40px;
+  padding-top: 32px;
+  border-top: 1px solid rgba(120, 92, 56, 0.18);
+  text-align: center;
+}
+
+.start__worlds-header {
+  margin-bottom: 24px;
+}
+
+.start__worlds-heading {
+  font-family: var(--mm-display);
+  font-weight: 600;
+  font-size: clamp(1.4rem, 3vw, 1.9rem);
+  letter-spacing: 0.01em;
+  margin: 0 0 8px;
+  background: linear-gradient(180deg, #e0aa4a, var(--mm-brass) 55%, #9c6f28);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.start__worlds-intro {
+  color: var(--mm-ink-soft);
+  font-size: var(--mm-fs-sm);
+  font-style: italic;
+  margin: 0;
+  max-width: 44ch;
+  margin-inline: auto;
+  line-height: 1.55;
+}
+
+/* Responsive grid: 1-up on narrow, 2-up once there's room. */
+.start__worlds-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+@media (min-width: 560px) {
+  .start__worlds-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Individual world card — behaves like a button. */
+.start__world-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  border: 1px solid rgba(120, 92, 56, 0.25);
+  border-radius: var(--mm-radius-sm);
+  background: rgba(252, 246, 235, 0.72);
+  box-shadow: var(--mm-shadow-sm, 0 2px 8px rgba(60, 40, 20, 0.1));
+  transition: transform 0.14s ease, box-shadow 0.14s ease, border-color 0.14s ease;
+  overflow: hidden;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  /* Reset button defaults */
+  font-family: inherit;
+  color: inherit;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.start__world-card:hover,
+.start__world-card:focus-visible {
+  transform: translateY(-2px);
+  border-color: var(--mm-brass);
+  box-shadow: 0 6px 20px rgba(60, 40, 20, 0.15), 0 0 0 2px rgba(224, 170, 74, 0.3);
+  outline: none;
+}
+
+.start__world-card:active {
+  transform: translateY(0);
+}
+
+/* Preview image area */
+.start__world-preview {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: linear-gradient(135deg, rgba(240, 220, 180, 0.5), rgba(200, 170, 130, 0.4));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.start__world-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 0;
+  display: block;
+}
+
+.start__world-placeholder {
+  font-size: 3rem;
+  opacity: 0.55;
+  filter: drop-shadow(0 2px 6px rgba(60, 40, 20, 0.2));
+  user-select: none;
+}
+
+/* Text + CTA area below the preview */
+.start__world-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 18px 18px;
+}
+
+.start__world-name {
+  font-family: var(--mm-display);
+  font-weight: 600;
+  font-size: var(--mm-fs-md);
+  color: var(--mm-ink);
+  line-height: 1.2;
+}
+
+.start__world-blurb {
+  font-size: var(--mm-fs-sm);
+  color: var(--mm-ink-soft);
+  line-height: 1.5;
+  flex: 1;
+}
+
+/* The CTA uses mm-btn styling but lives inside the card button. We want it to
+   look like a label, not an interactive element (the whole card is clickable). */
+.start__world-cta {
+  display: inline-block;
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 8px 16px;
+  font-size: var(--mm-fs-sm);
+  pointer-events: none;
+}
+
+/* Variation seed input for the gallery */
+.start__worlds-seed {
+  display: block;
+  text-align: left;
+  max-width: 100%;
+  margin: 0 auto 6px;
+}
+
+.start__worlds-seed-input {
+  width: 100%;
+}
+
+/* Error chips for broken world files */
+.start__worlds-errors {
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.start__world-error-chip {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--mm-radius-sm);
+  background: rgba(180, 60, 40, 0.07);
+  border: 1px solid rgba(180, 60, 40, 0.2);
+  text-align: left;
+}
+
+.start__world-error-id {
+  font-family: monospace;
+  font-size: var(--mm-fs-xs);
+  font-weight: 700;
+  color: #9b3122;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.start__world-error-msg {
+  font-size: var(--mm-fs-xs);
+  color: var(--mm-ink-soft);
+  line-height: 1.4;
+}
+
+/* ===========================================================================
+   Add Your Own World — contribute-a-world invitation + pipeline popup
+   =========================================================================== */
+
+.start__contribute {
+  margin-top: 36px;
+  padding-top: 32px;
+  border-top: 1px solid rgba(120, 92, 56, 0.18);
+  text-align: center;
+}
+
+.start__contribute-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 22px;
+}
+
+.start__contribute-actions .mm-btn {
+  text-decoration: none;
+}
+
+/* ----- The pipeline popup ----- */
+.start__modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(74, 53, 34, 0.42);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  animation: mm-fade-in 0.22s ease;
+}
+
+.start__modal {
+  position: relative;
+  z-index: 1;
+  width: min(560px, 94vw);
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  padding: 34px 34px 30px;
+  text-align: left;
+  border-radius: var(--mm-radius-xl);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  background: rgba(252, 246, 235, 0.92);
+  box-shadow: var(--mm-shadow-lift);
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+  backdrop-filter: blur(14px) saturate(1.1);
+  color: var(--mm-ink);
+  animation: mm-pop-in 0.32s var(--mm-ease);
+}
+
+.start__modal-close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  line-height: 1;
+  border: none;
+  border-radius: var(--mm-radius-pill);
+  background: rgba(120, 92, 56, 0.1);
+  color: var(--mm-ink-soft);
+  cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+.start__modal-close:hover {
+  background: rgba(120, 92, 56, 0.2);
+  color: var(--mm-ink);
+}
+
+.start__modal-kicker {
+  font-size: var(--mm-fs-xs);
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--mm-brass);
+  margin-bottom: 6px;
+}
+
+.start__modal-title {
+  font-family: var(--mm-display);
+  font-weight: 600;
+  font-size: clamp(1.5rem, 3.4vw, 2rem);
+  margin: 0;
+  line-height: 1.1;
+  color: var(--mm-ink);
+}
+
+.start__modal-lede {
+  color: var(--mm-ink-soft);
+  font-size: var(--mm-fs-sm);
+  line-height: 1.55;
+  margin: 12px 0 20px;
+}
+
+.start__steps {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0 4px 0 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.start__step {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.start__step-num {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mm-display);
+  font-weight: 700;
+  font-size: var(--mm-fs-sm);
+  color: #4a3406;
+  border-radius: var(--mm-radius-pill);
+  background: linear-gradient(180deg, var(--mm-honey), var(--mm-brass));
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.3) inset;
+}
+
+.start__step-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.start__step-title {
+  font-weight: 700;
+  font-size: var(--mm-fs-md);
+  color: var(--mm-ink);
+}
+
+.start__step-body {
+  font-size: var(--mm-fs-sm);
+  color: var(--mm-ink-soft);
+  line-height: 1.5;
+}
+
+.start__step-body code {
+  font-family: var(--mm-mono, ui-monospace, monospace);
+  font-size: 0.86em;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: rgba(120, 92, 56, 0.12);
+  color: #6f4e1f;
+  white-space: nowrap;
+}
+
+.start__step-body em {
+  color: var(--mm-ink);
+  font-style: italic;
+}
+
+.start__modal-cta {
+  align-self: flex-start;
+  margin-top: 18px;
+  text-decoration: none;
 }

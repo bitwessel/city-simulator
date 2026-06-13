@@ -66,7 +66,16 @@ export function simulateDay(
   input: City,
   options: SimulateDayOptions = {},
 ): SimulationTickResult {
-  const eventPool = options.eventPool ?? EVENT_POOL;
+  // Curated worlds contribute bespoke events that travel with the city state
+  // (phase 07). They join the pool for this run only — both for random
+  // selection and for chain resolution (`maybeTriggerEvent` looks chains up in
+  // this same array) — so a curated world's chains resolve and a replay/reload
+  // resolves against the same events. A random-seed city has no `worldEvents`,
+  // so the pool (and thus the simulation) stays byte-identical to today.
+  const eventPool = [
+    ...(options.eventPool ?? EVENT_POOL),
+    ...(input.worldEvents ?? []),
+  ];
   const headlinePool = options.headlinePool ?? HEADLINE_POOL;
 
   const city: City = structuredClone(input);

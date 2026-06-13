@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useGameStore } from '../state/store';
+import { CuratedWorlds } from './CuratedWorlds';
+import { ContributeWorld } from './ContributeWorld';
 import '../styles/start.css';
 
 /** A handful of drifting lanterns, each with randomized timing/offset. */
@@ -37,34 +39,41 @@ export function StartScreen() {
       ))}
 
       <main className="start__card mm-panel--gloss">
-        <div className="start__crest" aria-hidden>🏰</div>
-        <h1 className="start__title">Mythic Mayor</h1>
-        <p className="start__subtitle">Every great city begins as a rumor.</p>
-        <p className="start__desc">
-          You are about to become mayor of a city that does not exist yet. Sign here, and the
-          surveyors, goblins, and over-enthusiastic wizards will conjure one around you. Govern it
-          one day at a time and see what it becomes.
-        </p>
+        <section className="start__col start__col--main">
+          <div className="start__crest" aria-hidden>🏰</div>
+          <h1 className="start__title">Mythic Mayor</h1>
+          <p className="start__subtitle">Every great city begins as a rumor.</p>
+          <p className="start__desc">
+            You are about to become mayor of a city that does not exist yet. Sign here, and the
+            surveyors, goblins, and over-enthusiastic wizards will conjure one around you. Govern it
+            one day at a time and see what it becomes.
+          </p>
 
-        <label className="start__seed">
-          <span className="start__seed-label">City Seed</span>
-          <input
-            className="start__seed-input"
-            type="text"
-            value={seed}
-            placeholder="Leave blank for a surprise…"
-            onChange={(e) => setSeed(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') create();
-            }}
-            maxLength={48}
-          />
-        </label>
+          <label className="start__seed">
+            <span className="start__seed-label">City Seed</span>
+            <input
+              className="start__seed-input"
+              type="text"
+              value={seed}
+              placeholder="Leave blank for a surprise…"
+              onChange={(e) => setSeed(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') create();
+              }}
+              maxLength={48}
+            />
+          </label>
 
-        <button className="mm-btn mm-btn--brass start__create" onClick={create}>
-          Create New City
-        </button>
-        <p className="start__hint">The same seed always grows the same city.</p>
+          <button className="mm-btn mm-btn--brass start__create" onClick={create}>
+            Create New City
+          </button>
+          <p className="start__hint">The same seed always grows the same city.</p>
+        </section>
+
+        <section className="start__col start__col--worlds">
+          <CuratedWorlds />
+          <ContributeWorld />
+        </section>
       </main>
     </div>
   );

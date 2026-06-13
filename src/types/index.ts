@@ -852,6 +852,117 @@ export interface City {
    * replays reproduce the casting exactly.
    */
   citizenInvolvements?: CitizenInvolvement[];
+  /**
+   * The id of the curated world this city was loaded from (phase 07), or absent
+   * for a plain random-seed run. Travels with the city state so the picker can
+   * label a save and so a replay knows which world's bespoke events apply.
+   */
+  worldId?: string;
+  /**
+   * Bespoke `GameEventDef`s contributed by the curated world this city loaded
+   * from (phase 07). The engine joins them onto the core `EVENT_POOL` for this
+   * run only — both for random selection and chain resolution — so they must
+   * travel with the city state (a replay or a reloaded save resolves its chains
+   * against the same events). Absent on random-seed runs, leaving the pool, and
+   * thus the simulation, byte-identical to today.
+   */
+  worldEvents?: GameEventDef[];
+}
+
+// ----- Curated worlds (phase 07) ---------------------------------------------
+
+/**
+ * A hand-authored world file (`worlds/<id>/world.json`). A world overrides only
+ * what it specifies and lets the deterministic generator fill everything else
+ * around its `baseSeed` — sculpting the interesting 20% rather than placing
+ * every bush. Plain serializable data, UI-free, validated by `src/worlds`.
+ *
+ * Everything is optional except `schemaVersion`, `id`, `name`, and `baseSeed`.
+ */
+export interface WorldDef {
+  /** Schema version gate — currently always `1`. */
+  schemaVersion: 1;
+  /** Stable world id; matches the folder name and namespaces bespoke events. */
+  id: string;
+  /** Display name shown in the picker and used as the city name. */
+  name: string;
+  /** The seed handed to the generator for everything this world doesn't pin. */
+  baseSeed: string;
+  /** Lore overrides — the words that frame the world for the player. */
+  lore?: WorldLore;
+  /**
+   * Terrain overrides, shallow-merged onto the seed's generated terrain (so an
+   * author can nudge size/baseHeight/river without redescribing the whole
+   * heightfield). Omitted ⇒ the generated terrain stands.
+   */
+  terrain?: Partial<TerrainData>;
+  /** Pinned districts — type/name/position/wealth/palette hints. */
+  districts?: WorldDistrictPin[];
+  /** Completed landmark buildings placed at founding. */
+  landmarks?: WorldLandmark[];
+  /** Pinned/overridden factions by archetype. */
+  factions?: WorldFactionPin[];
+  /** Named citizens (phase 06 shape) merged into the city's cast. */
+  cast?: NotableCitizen[];
+  /** Quirks: ids from the pool (string) and/or inline bespoke definitions. */
+  quirks?: (string | CityQuirk)[];
+  /**
+   * Bespoke events and chains for this world. Ids MUST be namespaced
+   * `world/<id>/...` and are validated exactly like the core pool.
+   */
+  events?: GameEventDef[];
+}
+
+/** Lore overrides — the framing words for a curated world. */
+export interface WorldLore {
+  /** Replaces the generated tagline (the one-liner under the city name). */
+  tagline?: string;
+  /** Replaces the opening mayor briefing. */
+  briefing?: string;
+  /** A short blurb for the world picker card. */
+  blurb?: string;
+  /** Forces the starting visual mood (otherwise derived from stats). */
+  moodLean?: CityMood;
+  /** A palette hint string for the renderer (free-form, forward-compat). */
+  paletteLean?: string;
+}
+
+/**
+ * A pinned district. Only `type` is required; the loader retitles/recolors/
+ * repositions a matching generated district (or adds one if none exists). A
+ * pinned `position` always wins over the generator's placement.
+ */
+export interface WorldDistrictPin {
+  type: DistrictType;
+  name?: string;
+  position?: { x: number; z: number };
+  /** Additive nudge to the district's generated wealth (-100..100). */
+  wealthTilt?: number;
+  palette?: { baseColor: string; accentColor: string };
+}
+
+/** A completed landmark building placed at founding (day 0). */
+export interface WorldLandmark {
+  /** The landmark kind to place (prefer one from LANDMARK_BUILDING_KINDS). */
+  building: BuildingKind;
+  /** Host district type; the first district is used if omitted or unmatched. */
+  districtType?: DistrictType;
+}
+
+/**
+ * A pinned/overridden faction. `archetype` selects the matching generated
+ * faction (or adds one if absent); the rest override its generated values.
+ */
+export interface WorldFactionPin {
+  archetype: FactionArchetype;
+  name?: string;
+  agenda?: string;
+  /** 0..100 override. */
+  satisfaction?: number;
+  /** 0..100 override. */
+  influence?: number;
+  /** Relationship overrides toward other archetypes, -100..100. */
+  relationshipOverrides?: Partial<Record<FactionArchetype, number>>;
 }
 
 // ----- Engine results -----------------------------------------------------------------------
